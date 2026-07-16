@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { StringDecoder } from 'node:string_decoder';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import type {
@@ -72,19 +73,34 @@ export async function runSandboxdCommand(
     let stdout = '';
     let stderr = '';
     let settled = false;
+    const stdoutDecoder = new StringDecoder('utf8');
+    const stderrDecoder = new StringDecoder('utf8');
+    const appendStdout = (chunk: string) => {
+      stdout += chunk;
+      callbacks?.onStdout?.(chunk);
+    };
+    const appendStderr = (chunk: string) => {
+      stderr += chunk;
+      callbacks?.onStderr?.(chunk);
+    };
+    const flushDecoders = () => {
+      const stdoutTail = stdoutDecoder.end();
+      if (stdoutTail) appendStdout(stdoutTail);
+      const stderrTail = stderrDecoder.end();
+      if (stderrTail) appendStderr(stderrTail);
+    };
     const stream = client.execStream(request, metadata);
     stream.on('data', (event: SandboxdExecEvent) => {
       if (event.stdout) {
-        const chunk = event.stdout.toString();
-        stdout += chunk;
-        callbacks?.onStdout?.(chunk);
+        const chunk = stdoutDecoder.write(event.stdout);
+        if (chunk) appendStdout(chunk);
       }
       if (event.stderr) {
-        const chunk = event.stderr.toString();
-        stderr += chunk;
-        callbacks?.onStderr?.(chunk);
+        const chunk = stderrDecoder.write(event.stderr);
+        if (chunk) appendStderr(chunk);
       }
       if (event.exit) {
+        flushDecoders();
         settled = true;
         resolve({
           stdout,
@@ -95,6 +111,7 @@ export async function runSandboxdCommand(
       }
     });
     stream.on('error', error => {
+      client.close();
       if (!settled) reject(error);
     });
     stream.on('end', () => {
