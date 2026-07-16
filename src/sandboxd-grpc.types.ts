@@ -19,6 +19,15 @@ export interface SandboxdExecEvent {
   exit?: SandboxdExecExit;
 }
 
+export interface SandboxdExecution {
+  id: string;
+  status: string;
+  stdout: Buffer;
+  stderr: Buffer;
+  exit_code: number;
+  timed_out: boolean;
+}
+
 export interface RunSandboxdCommandInput {
   access: ZeishAccess;
   command: string;

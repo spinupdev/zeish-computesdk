@@ -4,6 +4,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import type {
   RunSandboxdCommandInput,
   SandboxdCommandResult,
+  SandboxdExecution,
   SandboxdExecEvent,
   SandboxdExecRequest,
   StreamCallbackOptions,
@@ -38,6 +39,11 @@ export async function runSandboxdCommand(
       request: SandboxdExecRequest,
       metadata: grpc.Metadata
     ): grpc.ClientReadableStream<SandboxdExecEvent>;
+    startExecution(
+      request: SandboxdExecRequest,
+      metadata: grpc.Metadata,
+      callback: (error: grpc.ServiceError | null, response: SandboxdExecution) => void
+    ): void;
   };
   const metadata = new grpc.Metadata();
   metadata.set('authorization', `Bearer ${input.access.token}`);
@@ -48,6 +54,19 @@ export async function runSandboxdCommand(
     working_dir: input.options?.cwd ?? '',
   };
   const callbacks = input.options as StreamCallbackOptions | undefined;
+
+  if (input.options?.background) {
+    return new Promise((resolve, reject) => {
+      client.startExecution(request, metadata, (error, _execution) => {
+        client.close();
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve({ stdout: '', stderr: '', exitCode: 0, durationMs: Date.now() - startedAt });
+      });
+    });
+  }
 
   return new Promise((resolve, reject) => {
     let stdout = '';
