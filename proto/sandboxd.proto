@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package sandboxd.v1;
+
+service SandboxdService {
+  rpc ExecStream(ExecRequest) returns (stream ExecEvent);
+}
+
+message ExecRequest {
+  repeated string cmd = 1;
+  int32 timeout_seconds = 2;
+  map<string, string> env = 3;
+  string working_dir = 4;
+}
+
+message ExecExit {
+  int32 exit_code = 1;
+  bool timed_out = 2;
+}
+
+message ExecEvent {
+  oneof payload {
+    bytes stdout = 1;
+    bytes stderr = 2;
+    ExecExit exit = 3;
+  }
+}
