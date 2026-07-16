@@ -14,6 +14,7 @@ import type {
   ZeishSandbox,
   ZeishSnapshot,
 } from './zeish.types.js';
+import { runSandboxdCommand } from './sandboxd-grpc.js';
 
 const defaultBaseUrl = 'https://api.dvito.cloud/api/v1';
 
@@ -96,9 +97,8 @@ export const zeish = defineProvider<ZeishSandbox, ZeishConfig>({
       destroy: async (config, sandboxId) => {
         await request<void>(config, `/public/sandboxes/${sandboxId}`, { method: 'DELETE' });
       },
-      runCommand: async (_sandbox, _command, _options?: RunCommandOptions): Promise<CommandResult> => {
-        throw new Error('Zeish command execution requires sandboxd gRPC transport. Use filesystem operations until streaming exec is released.');
-      },
+      runCommand: async (sandbox, command, options?: RunCommandOptions): Promise<CommandResult> =>
+        runSandboxdCommand({ access: await access(sandbox), command, options }),
       getInfo: async sandbox => ({
         id: sandbox.id,
         provider: 'zeish',

@@ -7,9 +7,13 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "files": ["dist"],
+  "files": ["dist", "proto"],
   "scripts": { "build": "tsup", "typecheck": "tsc --noEmit", "test": "vitest run" },
-  "dependencies": { "@computesdk/provider": "^1.0.28" },
-  "devDependencies": { "tsup": "^8.3.5", "typescript": "^5.7.2", "vitest": "^2.1.8" },
+  "dependencies": {
+    "@computesdk/provider": "^1.0.28",
+    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/proto-loader": "^0.8.0"
+  },
+  "devDependencies": { "@types/node": "^22.10.2", "tsup": "^8.3.5", "typescript": "^5.7.2", "vitest": "^2.1.8" },
   "keywords": ["computesdk", "zeish", "sandbox", "provider"]
 }
