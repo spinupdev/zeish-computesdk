@@ -43,6 +43,8 @@ jobs:
     if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      OPENAPI_GENERATOR_IMAGE: openapitools/openapi-generator-cli@sha256:338dc617d26fb4a515891dee8a5c345ad302e191c6010c6a1f77ed6f6ff7476a
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,22 +56,32 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - name: Generate REST SDK sources
+      - name: Generate and test REST SDKs
         run: |
           pnpm install --frozen-lockfile --prefer-offline
           pnpm test:contract-release -- rest
-          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
+          rm -rf generated
+          docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
             -i /workspace/contracts/edge-public/v1/openapi.json \
-            -g typescript-fetch -o /workspace/generated/typescript
-          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
+            -g typescript-fetch -o /workspace/generated/typescript \
+            -p npmName=@zeish/edge,npmVersion=0.0.0
+          docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
             -i /workspace/contracts/edge-public/v1/openapi.json \
-            -g python -o /workspace/generated/python
-          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
+            -g python -o /workspace/generated/python \
+            -p packageName=zeish_edge,packageVersion=0.0.0
+          docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
             -i /workspace/contracts/edge-public/v1/openapi.json \
-            -g go -o /workspace/generated/go
+            -g go -o /workspace/generated/go \
+            --git-user-id spinupdev --git-repo-id zeish-computesdk-go \
+            -p packageName=edge
+          npm --prefix generated/typescript install --ignore-scripts
+          npm --prefix generated/typescript run build
+          docker run --rm -v "$PWD/generated/python:/workspace" -w /workspace python:3.12-slim \
+            sh -ec 'pip install --no-cache-dir . pytest >/dev/null && pytest -q'
+          docker run --rm -v "$PWD/generated/go:/workspace" -w /workspace golang:1.24-alpine \
+            sh -ec 'go get github.com/stretchr/testify/assert@v1.10.0 && go test ./...'
       - name: Verify generated REST artifacts
         run: |
-          pnpm install --frozen-lockfile --prefer-offline
           pnpm test:generated-contracts -- rest
       - uses: actions/upload-artifact@v4
         with:

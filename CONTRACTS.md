@@ -15,7 +15,8 @@ It is linted and generated in CI from its pinned `buf.gen.yaml` template.
 
 REST and sandboxd releases are intentionally independent: a release of either
 contract validates only its own generated artifacts, while provider validation
-always runs. Generated artifacts are deliberately created in CI and uploaded
-to language-package release jobs. A contract change is not released until the
-public API compatibility gate in Edge has passed and its relevant generation
-and package tests have passed.
+always runs. The REST release job generates named TypeScript, Python, and Go
+packages, compiles TypeScript, runs Python's generated suite, and runs Go's
+generated suite before uploading the packages and their generated docs. A
+contract change is not released until the public API compatibility gate in Edge
+has passed and its relevant generation and package tests have passed.

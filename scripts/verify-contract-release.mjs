@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-const target = process.argv[2];
+const target = process.argv.find(argument => argument === "rest" || argument === "sandboxd");
 const roots = {
   rest: "contracts/edge-public",
   sandboxd: "contracts/sandboxd",
