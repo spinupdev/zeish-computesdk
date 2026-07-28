@@ -18,9 +18,67 @@ permissions:
   contents: read
 
 jobs:
-  generate-and-test:
+  provider:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install and test the ComputeSDK provider
+        run: |
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm typecheck
+          pnpm build
+          pnpm test
+
+  rest:
+    if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Generate REST SDK sources
+        run: |
+          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
+            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -g typescript-fetch -o /workspace/generated/typescript
+          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
+            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -g python -o /workspace/generated/python
+          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
+            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -g go -o /workspace/generated/go
+      - name: Verify generated REST artifacts
+        run: |
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm test:generated-contracts -- rest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-rest-sdks
+          path: generated
+          if-no-files-found: error
+
+  sandboxd:
+    if: ${{ hashFiles('contracts/sandboxd/buf.yaml') != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,26 +95,12 @@ jobs:
         run: |
           buf lint contracts/sandboxd
           buf generate contracts/sandboxd --template contracts/sandboxd/buf.gen.yaml --output generated/sandboxd
-      - name: Generate REST SDK sources
-        run: |
-          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
-            -i /workspace/contracts/edge-public/v1/openapi.json \
-            -g typescript-fetch -o /workspace/generated/typescript
-          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
-            -i /workspace/contracts/edge-public/v1/openapi.json \
-            -g python -o /workspace/generated/python
-          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
-            -i /workspace/contracts/edge-public/v1/openapi.json \
-            -g go -o /workspace/generated/go
-      - name: Install and test the ComputeSDK provider
+      - name: Verify generated sandboxd artifacts
         run: |
           pnpm install --frozen-lockfile --prefer-offline
-          pnpm build
-          pnpm test
-      - name: Verify generated language contract artifacts
-        run: pnpm test:generated-contracts
-      - name: Publish generated SDK artifacts for language-package release jobs
-        uses: actions/upload-artifact@v4
+          pnpm test:generated-contracts -- sandboxd
+      - uses: actions/upload-artifact@v4
         with:
-          name: generated-sdks
-          path: generated
+          name: generated-sandboxd-sdk
+          path: generated/sandboxd
+          if-no-files-found: error
