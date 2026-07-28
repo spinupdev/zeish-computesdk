@@ -52,15 +52,13 @@ describe("createZeishApi", () => {
   });
 
   it("exposes the versioned template, network, and volume resource surface", async () => {
-    const fetch = vi
-      .fn<typeof globalThis.fetch>()
-      .mockImplementation(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ data: [], nextCursor: null }), {
-            status: 200,
-          }),
-        ),
-      );
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ data: [], nextCursor: null }), {
+          status: 200,
+        }),
+      ),
+    );
     const api = createZeishApi({ apiKey: "zeish_live_test", fetch });
 
     await api.listTemplates({ limit: 20 });
@@ -72,5 +70,30 @@ describe("createZeishApi", () => {
       "https://api.dvito.cloud/api/v1/public/networks?cursor=network-cursor",
       "https://api.dvito.cloud/api/v1/public/volumes",
     ]);
+  });
+
+  it("preserves the stable public error envelope for callers", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "rate_limited",
+            message: "Too many requests",
+            requestId: "request_1",
+          },
+        }),
+        { status: 429 },
+      ),
+    );
+    const api = createZeishApi({ apiKey: "zeish_live_test", fetch });
+
+    await expect(api.listTemplates()).rejects.toMatchObject({
+      status: 429,
+      error: {
+        code: "rate_limited",
+        message: "Too many requests",
+        requestId: "request_1",
+      },
+    });
   });
 });

@@ -6,6 +6,26 @@ export interface ZeishConfig {
   createIdempotencyKey?: () => string;
 }
 
+export type ZeishPublicApiErrorCode =
+  | "invalid_request"
+  | "authentication_required"
+  | "permission_denied"
+  | "not_found"
+  | "conflict"
+  | "rate_limited"
+  | "internal_error";
+
+export interface ZeishPublicApiError {
+  code: ZeishPublicApiErrorCode;
+  message: string;
+  requestId?: string;
+  details?: Record<string, unknown>;
+}
+
+export interface ZeishPublicApiErrorResponse {
+  error: ZeishPublicApiError;
+}
+
 export type ZeishSandboxStatus =
   | "initialized"
   | "pending"

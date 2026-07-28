@@ -13,6 +13,8 @@ import type {
   ZeishPage,
   ZeishPageOptions,
   ZeishPreviewCode,
+  ZeishPublicApiError,
+  ZeishPublicApiErrorResponse,
   ZeishPublicApi,
   ZeishSandbox,
   ZeishSandboxEvent,
@@ -31,10 +33,27 @@ export class ZeishApiError extends Error {
     public readonly body: string,
     public readonly method: string,
     public readonly path: string,
+    public readonly error?: ZeishPublicApiError,
   ) {
     super(`Zeish API ${status} (${method} ${path}): ${body}`);
     this.name = "ZeishApiError";
   }
+}
+
+function parsePublicApiError(body: string): ZeishPublicApiError | undefined {
+  try {
+    const payload = JSON.parse(body) as Partial<ZeishPublicApiErrorResponse>;
+    if (
+      payload.error &&
+      typeof payload.error.code === "string" &&
+      typeof payload.error.message === "string"
+    ) {
+      return payload.error;
+    }
+  } catch {
+    // Preserve non-JSON responses verbatim for transport and proxy errors.
+  }
+  return undefined;
 }
 
 function idempotencyKey(config: ZeishConfig): string {
@@ -67,11 +86,13 @@ export async function request<T>(
   });
 
   if (!response.ok) {
+    const body = await response.text();
     throw new ZeishApiError(
       response.status,
-      await response.text(),
+      body,
       init.method ?? "GET",
       path,
+      parsePublicApiError(body),
     );
   }
   return response.json() as Promise<T>;
