@@ -1,12 +1,16 @@
 import type {
   ZeishAccess,
   ZeishConfig,
+  ZeishCreateNetworkInput,
   ZeishCreatePreviewCodeInput,
   ZeishCreateSandboxInput,
+  ZeishCreateVolumeInput,
   ZeishListEventsOptions,
   ZeishListLogsOptions,
   ZeishLogEntry,
+  ZeishNetwork,
   ZeishOperationResult,
+  ZeishPage,
   ZeishPageOptions,
   ZeishPreviewCode,
   ZeishPublicApi,
@@ -14,7 +18,9 @@ import type {
   ZeishSandboxEvent,
   ZeishSandboxPage,
   ZeishSnapshot,
+  ZeishTemplate,
   ZeishTerminalUrlResponse,
+  ZeishVolume,
 } from "./zeish.types.js";
 
 export const defaultBaseUrl = "https://api.dvito.cloud/api/v1";
@@ -92,6 +98,12 @@ function mutation(config: ZeishConfig, init: RequestInit): RequestInit {
 export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
   const sandboxPath = (sandboxId: string) =>
     `/public/sandboxes/${encodeURIComponent(sandboxId)}`;
+  const networkPath = (networkId: string) =>
+    `/public/networks/${encodeURIComponent(networkId)}`;
+  const volumePath = (volumeId: string) =>
+    `/public/volumes/${encodeURIComponent(volumeId)}`;
+  const templatePath = (templateId: string) =>
+    `/public/templates/${encodeURIComponent(templateId)}`;
   const lifecycle = (
     sandboxId: string,
     action: "start" | "pause" | "resume" | "stop" | "kill",
@@ -167,5 +179,49 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
         `${sandboxPath(sandboxId)}/snapshots/${encodeURIComponent(snapshotId)}`,
         mutation(config, { method: "DELETE" }),
       ),
+    createVolume: (input: ZeishCreateVolumeInput) =>
+      request<ZeishVolume>(
+        config,
+        "/public/volumes",
+        mutation(config, { method: "POST", body: JSON.stringify(input) }),
+      ),
+    listVolumes: (options: ZeishPageOptions = {}) =>
+      request<ZeishPage<ZeishVolume>>(
+        config,
+        `/public/volumes${queryString(options)}`,
+      ),
+    getVolume: (volumeId) => request<ZeishVolume>(config, volumePath(volumeId)),
+    deleteVolume: (volumeId) =>
+      request<ZeishVolume>(
+        config,
+        volumePath(volumeId),
+        mutation(config, { method: "DELETE" }),
+      ),
+    createNetwork: (input: ZeishCreateNetworkInput) =>
+      request<ZeishNetwork>(
+        config,
+        "/public/networks",
+        mutation(config, { method: "POST", body: JSON.stringify(input) }),
+      ),
+    listNetworks: (options: ZeishPageOptions = {}) =>
+      request<ZeishPage<ZeishNetwork>>(
+        config,
+        `/public/networks${queryString(options)}`,
+      ),
+    getNetwork: (networkId) =>
+      request<ZeishNetwork>(config, networkPath(networkId)),
+    deleteNetwork: (networkId) =>
+      request<ZeishNetwork>(
+        config,
+        networkPath(networkId),
+        mutation(config, { method: "DELETE" }),
+      ),
+    listTemplates: (options: ZeishPageOptions = {}) =>
+      request<ZeishPage<ZeishTemplate>>(
+        config,
+        `/public/templates${queryString(options)}`,
+      ),
+    getTemplate: (templateId) =>
+      request<ZeishTemplate>(config, templatePath(templateId)),
   };
 }
