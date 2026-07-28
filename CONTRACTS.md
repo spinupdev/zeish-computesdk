@@ -17,6 +17,10 @@ REST and sandboxd releases are intentionally independent: a release of either
 contract validates only its own generated artifacts, while provider validation
 always runs. The REST release job generates named TypeScript, Python, and Go
 packages, compiles TypeScript, runs Python's generated suite, and runs Go's
-generated suite before uploading the packages and their generated docs. A
-contract change is not released until the public API compatibility gate in Edge
-has passed and its relevant generation and package tests have passed.
+generated suite before uploading language artifacts and generated docs. A
+manual public release can publish the TypeScript and Python packages only after
+those same gates succeed; it requires `NPM_TOKEN` and `PYPI_TOKEN` respectively.
+The Go artifact is a versioned source archive until a dedicated Go module
+repository or a committed `go/` module is selected. A contract change is not
+released until the public API compatibility gate in Edge has passed and its
+relevant generation and package tests have passed.
