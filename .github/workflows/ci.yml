@@ -8,7 +8,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "tsconfig.json"
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/**"
   push:
     branches: [main]
     paths:
@@ -17,6 +17,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "tsconfig.json"
+      - ".github/workflows/**"
 
 concurrency:
   group: provider-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

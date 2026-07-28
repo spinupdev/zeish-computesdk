@@ -1,0 +1,55 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_npm:
+        description: Publish the validated provider package to npm.
+        required: true
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "sdk-v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - name: Install and validate provider
+        run: |
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm typecheck
+          pnpm build
+          pnpm test
+      - name: Pack provider release artifact
+        run: npm pack --pack-destination release-artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: computesdk-provider
+          path: release-artifacts/*.tgz
+          if-no-files-found: error
+      - name: Publish provider to npm
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
