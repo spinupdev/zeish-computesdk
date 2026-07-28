@@ -17,7 +17,11 @@ const expected =
         "generated/python/zeish_edge/__init__.py",
         "generated/go/go.mod",
       ]
-    : ["generated/sandboxd/generated/typescript/sandboxd/v1/sandboxd_pb.ts"];
+    : [
+        "generated/sandboxd/generated/typescript/sandboxd/v1/sandboxd_pb.ts",
+        "generated/sandboxd/generated/go/sandboxd/v1/sandboxd.pb.go",
+        "generated/sandboxd/generated/python/sandboxd/v1/sandboxd_pb2.py",
+      ];
 
 for (const path of expected) {
   await access(path);

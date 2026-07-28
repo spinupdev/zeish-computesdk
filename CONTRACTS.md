@@ -11,7 +11,8 @@ ComputeSDK provider is the handwritten TypeScript façade over that generated
 surface and sandboxd's generated RPC bindings.
 
 `contracts/sandboxd` is the independent Buf module for the direct data plane.
-It is linted and generated in CI from its pinned `buf.gen.yaml` template.
+It is linted and generated in CI from its pinned `buf.gen.yaml` template for
+TypeScript, Python, and Go.
 
 REST and sandboxd releases are intentionally independent: a release of either
 contract validates only its own generated artifacts, while provider validation
