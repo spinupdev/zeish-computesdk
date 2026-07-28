@@ -3,13 +3,17 @@ name: contracts
 on:
   pull_request:
     paths:
-      - 'contracts/**'
-      - '.github/workflows/contracts.yml'
+      - "contracts/**"
+      - ".github/workflows/contracts.yml"
   push:
     branches: [main]
     paths:
-      - 'contracts/**'
+      - "contracts/**"
   workflow_dispatch:
+
+concurrency:
+  group: contracts-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -17,8 +21,11 @@ permissions:
 jobs:
   generate-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -30,7 +37,7 @@ jobs:
       - name: Validate and generate sandboxd bindings
         run: |
           buf lint contracts/sandboxd
-          buf generate contracts/sandboxd --template contracts/sandboxd/buf.gen.yaml
+          buf generate contracts/sandboxd --template contracts/sandboxd/buf.gen.yaml --output generated/sandboxd
       - name: Generate REST SDK sources
         run: |
           docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
@@ -44,9 +51,11 @@ jobs:
             -g go -o /workspace/generated/go
       - name: Install and test the ComputeSDK provider
         run: |
-          pnpm install --frozen-lockfile
+          pnpm install --frozen-lockfile --prefer-offline
           pnpm build
           pnpm test
+      - name: Verify generated language contract artifacts
+        run: pnpm test:generated-contracts
       - name: Publish generated SDK artifacts for language-package release jobs
         uses: actions/upload-artifact@v4
         with:

@@ -1,0 +1,50 @@
+name: provider-ci
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "proto/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "tsconfig.json"
+      - ".github/workflows/ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "proto/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "tsconfig.json"
+
+concurrency:
+  group: provider-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Typecheck and build provider
+        run: |
+          pnpm typecheck
+          pnpm build
+      - name: Test provider contract facade
+        run: pnpm test
