@@ -56,6 +56,8 @@ jobs:
           cache: pnpm
       - name: Generate REST SDK sources
         run: |
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm test:contract-release -- rest
           docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
             -i /workspace/contracts/edge-public/v1/openapi.json \
             -g typescript-fetch -o /workspace/generated/typescript
@@ -93,6 +95,8 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
       - name: Validate and generate sandboxd bindings
         run: |
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm test:contract-release -- sandboxd
           buf lint contracts/sandboxd
           buf generate contracts/sandboxd --template contracts/sandboxd/buf.gen.yaml --output generated/sandboxd
       - name: Verify generated sandboxd artifacts

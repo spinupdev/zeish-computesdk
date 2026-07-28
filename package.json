@@ -20,7 +20,8 @@
     "build": "tsup src/index.ts --format esm --clean",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:generated-contracts": "node scripts/verify-generated-contracts.mjs"
+    "test:generated-contracts": "node scripts/verify-generated-contracts.mjs",
+    "test:contract-release": "node scripts/verify-contract-release.mjs"
   },
   "dependencies": {
     "@computesdk/provider": "^1.0.28",
