@@ -1,0 +1,54 @@
+name: contracts
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/**'
+      - '.github/workflows/contracts.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: bufbuild/buf-setup-action@v1
+      - name: Validate and generate sandboxd bindings
+        run: |
+          buf lint contracts/sandboxd
+          buf generate contracts/sandboxd --template contracts/sandboxd/buf.gen.yaml
+      - name: Generate REST SDK sources
+        run: |
+          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
+            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -g typescript-fetch -o /workspace/generated/typescript
+          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
+            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -g python -o /workspace/generated/python
+          docker run --rm -v "$PWD:/workspace" openapitools/openapi-generator-cli:v7.12.0 generate \
+            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -g go -o /workspace/generated/go
+      - name: Install and test the ComputeSDK provider
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm test
+      - name: Publish generated SDK artifacts for language-package release jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-sdks
+          path: generated
