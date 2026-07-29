@@ -4,10 +4,16 @@ on:
   pull_request:
     paths:
       - "contracts/**"
+      - ".github/workflows/contracts.yml"
+      - "scripts/verify-contract-release.mjs"
+      - "scripts/verify-generated-contracts.mjs"
   push:
     branches: [main]
     paths:
       - "contracts/**"
+      - ".github/workflows/contracts.yml"
+      - "scripts/verify-contract-release.mjs"
+      - "scripts/verify-generated-contracts.mjs"
   workflow_dispatch:
 
 concurrency:

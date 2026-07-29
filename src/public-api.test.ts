@@ -96,4 +96,17 @@ describe("createZeishApi", () => {
       },
     });
   });
+
+  it("preserves successful empty responses for delete operations", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const api = createZeishApi({
+      apiKey: "zeish_live_test",
+      createIdempotencyKey: () => "request-1",
+      fetch,
+    });
+
+    await expect(api.deleteSnapshot("sandbox-1", "snapshot-1")).resolves.toBeUndefined();
+  });
 });

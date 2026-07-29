@@ -3,6 +3,10 @@ name: release
 on:
   workflow_dispatch:
     inputs:
+      release_version:
+        description: Version to publish, without the sdk-v prefix.
+        required: true
+        type: string
       publish_npm:
         description: Publish the validated provider package to npm.
         required: true
@@ -47,6 +51,20 @@ jobs:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
+      - name: Resolve release version
+        id: version
+        env:
+          TAG_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          INPUT_VERSION: ${{ inputs.release_version }}
+        run: |
+          SDK_VERSION="${TAG_VERSION#sdk-v}"
+          SDK_VERSION="${SDK_VERSION:-$INPUT_VERSION}"
+          test -n "$SDK_VERSION"
+          echo "sdk_version=$SDK_VERSION" >> "$GITHUB_OUTPUT"
+      - name: Set provider package version
+        env:
+          SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+        run: npm version "$SDK_VERSION" --no-git-tag-version
       - name: Install and validate provider
         run: |
           pnpm install --frozen-lockfile --prefer-offline
@@ -58,11 +76,10 @@ jobs:
           mkdir -p release-artifacts/provider
           npm pack --pack-destination release-artifacts/provider
       - name: Generate and validate REST language packages
+        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
         env:
-          SDK_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.0' }}
+          SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
         run: |
-          test -f contracts/edge-public/v1/openapi.json
-          SDK_VERSION="${SDK_VERSION#sdk-v}"
           pnpm test:contract-release -- rest
           rm -rf generated
           docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
@@ -94,6 +111,7 @@ jobs:
           cp generated/python/README.md release-artifacts/rest/docs/python.md
           cp generated/go/README.md release-artifacts/rest/docs/go.md
       - uses: actions/upload-artifact@v4
+        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
         with:
           name: computesdk-provider
           path: release-artifacts/provider/*.tgz
@@ -104,17 +122,17 @@ jobs:
           path: release-artifacts/rest
           if-no-files-found: error
       - name: Publish provider to npm
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_npm
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_npm)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish release-artifacts/provider/*.tgz --access public
       - name: Publish generated REST TypeScript client to npm
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_rest_npm
+        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_npm)) }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish release-artifacts/rest/typescript/*.tgz --access public
       - name: Publish generated REST Python client to PyPI
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_rest_pypi
+        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_pypi)) }}
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}

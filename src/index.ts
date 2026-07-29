@@ -146,6 +146,23 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
       },
       getInstance: sandbox => sandbox,
     },
+    snapshot: {
+      create: async (config, sandboxId, options) => {
+        const snapshot = await createZeishApi(config).createSnapshot(
+          sandboxId,
+          options?.name ?? 'snapshot',
+        );
+        return {
+          id: snapshot.id,
+          provider: 'zeish',
+          createdAt: new Date(snapshot.createdAt),
+        };
+      },
+      list: async () => [],
+      delete: async () => {
+        throw new Error('Zeish snapshots are sandbox-scoped; delete them through the Zeish REST API.');
+      },
+    },
   },
 });
 
