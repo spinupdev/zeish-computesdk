@@ -1,0 +1,144 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Version to publish, without the sdk-v prefix.
+        required: true
+        type: string
+      publish_npm:
+        description: Publish the validated provider package to npm.
+        required: true
+        default: false
+        type: boolean
+      publish_rest_npm:
+        description: Publish the validated generated REST TypeScript package to npm.
+        required: true
+        default: false
+        type: boolean
+      publish_rest_pypi:
+        description: Publish the validated generated REST Python package to PyPI.
+        required: true
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "sdk-v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-pack:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    env:
+      OPENAPI_GENERATOR_IMAGE: openapitools/openapi-generator-cli@sha256:338dc617d26fb4a515891dee8a5c345ad302e191c6010c6a1f77ed6f6ff7476a
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - name: Resolve release version
+        id: version
+        env:
+          TAG_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          INPUT_VERSION: ${{ inputs.release_version }}
+        run: |
+          SDK_VERSION="${TAG_VERSION#sdk-v}"
+          SDK_VERSION="${SDK_VERSION:-$INPUT_VERSION}"
+          test -n "$SDK_VERSION"
+          echo "sdk_version=$SDK_VERSION" >> "$GITHUB_OUTPUT"
+      - name: Set provider package version
+        env:
+          SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+        run: npm version "$SDK_VERSION" --no-git-tag-version
+      - name: Install and validate provider
+        run: |
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm typecheck
+          pnpm build
+          pnpm test
+      - name: Pack provider release artifact
+        run: |
+          mkdir -p release-artifacts/provider
+          npm pack --pack-destination release-artifacts/provider
+      - name: Generate and validate REST language packages
+        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
+        env:
+          SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+        run: |
+          pnpm test:contract-release -- rest
+          rm -rf generated
+          docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
+            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -g typescript-fetch -o /workspace/generated/typescript \
+            -p "npmName=@zeish/edge,npmVersion=${SDK_VERSION}"
+          docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
+            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -g python -o /workspace/generated/python \
+            -p "packageName=zeish_edge,packageVersion=${SDK_VERSION}"
+          docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
+            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -g go -o /workspace/generated/go \
+            --git-user-id spinupdev --git-repo-id zeish-computesdk-go \
+            -p packageName=edge
+          npm --prefix generated/typescript install --ignore-scripts
+          npm --prefix generated/typescript run build
+          docker run --rm -v "$PWD/generated/python:/workspace" -w /workspace python:3.12-slim \
+            sh -ec 'pip install --no-cache-dir . pytest >/dev/null && pytest -q'
+          docker run --rm -v "$PWD/generated/go:/workspace" -w /workspace golang:1.24-alpine \
+            sh -ec 'go get github.com/stretchr/testify/assert@v1.10.0 && go test ./...'
+          pnpm test:generated-contracts -- rest
+          mkdir -p release-artifacts/rest/{typescript,python,go,docs}
+          npm --prefix generated/typescript pack --pack-destination "$PWD/release-artifacts/rest/typescript"
+          docker run --rm -v "$PWD:/workspace" -w /workspace/generated/python python:3.12-slim \
+            sh -ec 'pip install --no-cache-dir build >/dev/null && python -m build --outdir /workspace/release-artifacts/rest/python'
+          tar -C generated/go -czf "release-artifacts/rest/go/zeish-edge-go-${SDK_VERSION}.tar.gz" .
+          cp generated/typescript/README.md release-artifacts/rest/docs/typescript.md
+          cp generated/python/README.md release-artifacts/rest/docs/python.md
+          cp generated/go/README.md release-artifacts/rest/docs/go.md
+      - uses: actions/upload-artifact@v4
+        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
+        with:
+          name: computesdk-provider
+          path: release-artifacts/provider/*.tgz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zeish-rest-sdks
+          path: release-artifacts/rest
+          if-no-files-found: error
+      - name: Publish provider to npm
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_npm)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish release-artifacts/provider/*.tgz --access public
+      - name: Publish generated REST TypeScript client to npm
+        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_npm)) }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish release-artifacts/rest/typescript/*.tgz --access public
+      - name: Publish generated REST Python client to PyPI
+        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_pypi)) }}
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          docker run --rm \
+            -e TWINE_USERNAME -e TWINE_PASSWORD \
+            -v "$PWD/release-artifacts/rest/python:/artifacts" \
+            python:3.12-slim \
+            sh -ec 'pip install --no-cache-dir twine >/dev/null && twine upload /artifacts/*'
