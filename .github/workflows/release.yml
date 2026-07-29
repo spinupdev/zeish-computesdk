@@ -31,7 +31,7 @@ permissions:
 
 jobs:
   verify-and-pack:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     env:
       OPENAPI_GENERATOR_IMAGE: openapitools/openapi-generator-cli@sha256:338dc617d26fb4a515891dee8a5c345ad302e191c6010c6a1f77ed6f6ff7476a
