@@ -7,6 +7,7 @@ import type {
   ZeishSandboxCommandOptions,
   ZeishSandboxFiles,
   ZeishSandboxAction,
+  ZeishSandboxDesktop,
   ZeishSandboxSession,
   ZeishSandboxWaitOptions,
 } from './zeish-sandbox-client.types.js';
@@ -59,6 +60,7 @@ export function createZeishSandboxClient(
 class EdgeSandboxSession implements ZeishSandboxSession {
   private access: ZeishAccess | undefined;
   readonly files: ZeishSandboxFiles;
+  readonly desktop: ZeishSandboxDesktop;
 
   constructor(
     private readonly config: ZeishSandboxClientConfig,
@@ -93,6 +95,15 @@ class EdgeSandboxSession implements ZeishSandboxSession {
           method: 'POST',
         });
       },
+    };
+    this.desktop = {
+      screenshot: () => this.screenshot(),
+      action: (action) => this.act(action),
+      move: (x, y) => this.act({ type: 'move', x, y }),
+      click: (input = {}) => this.act({ type: 'click', ...input }),
+      scroll: (input) => this.act({ type: 'scroll', ...input }),
+      type: (text) => this.act({ type: 'type', text }),
+      key: (key) => this.act({ type: 'key', key }),
     };
   }
 
@@ -185,11 +196,15 @@ class EdgeSandboxSession implements ZeishSandboxSession {
   }
 
   async act(action: ZeishSandboxAction): Promise<void> {
-    await this.dataPlaneRequest('/action', {
+    const response = await this.dataPlaneRequest('/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(toSandboxdAction(action)),
     });
+    const result = await response.json() as { success?: boolean };
+    if (result.success !== true) {
+      throw new Error('Zeish sandbox desktop action returned an unsuccessful response.');
+    }
   }
 
   getTerminalUrl(): Promise<ZeishTerminalUrlResponse> {
