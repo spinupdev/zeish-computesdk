@@ -51,6 +51,9 @@ export interface ZeishSandboxSession {
   getAccess(forceRefresh?: boolean): Promise<ZeishAccess>;
   waitForAccess(options?: ZeishSandboxWaitOptions): Promise<ZeishAccess>;
   run(command: string, options?: ZeishSandboxCommandOptions): Promise<SandboxdCommandResult>;
+  isDataPlaneAvailable(): Promise<boolean>;
+  screenshot(): Promise<Buffer>;
+  act(action: ZeishSandboxAction): Promise<void>;
   getTerminalUrl(): Promise<ZeishTerminalUrlResponse>;
   createPreviewCode(input?: ZeishCreatePreviewCodeInput): Promise<ZeishPreviewCode>;
   listLogs(options?: ZeishListLogsOptions): Promise<ZeishLogEntry[]>;
@@ -75,5 +78,22 @@ export interface ZeishSandboxWaitOptions {
   timeoutMs?: number;
   pollIntervalMs?: number;
 }
+
+/** A mouse or keyboard action executed by sandboxd against the guest display. */
+export type ZeishSandboxAction =
+  | { type: 'move'; x: number; y: number }
+  | { type: 'click'; x?: number; y?: number; button?: ZeishMouseButton; clicks?: number }
+  | { type: 'type'; text: string }
+  | { type: 'key'; key: string }
+  | {
+      type: 'scroll';
+      x?: number;
+      y?: number;
+      amount?: number;
+      deltaX?: number;
+      deltaY?: number;
+    };
+
+export type ZeishMouseButton = 'left' | 'middle' | 'right' | 'back' | 'forward';
 
 export type ZeishSandboxClientConfig = ZeishConfig;

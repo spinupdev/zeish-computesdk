@@ -6,6 +6,7 @@ import type {
   ZeishSandboxClientConfig,
   ZeishSandboxCommandOptions,
   ZeishSandboxFiles,
+  ZeishSandboxAction,
   ZeishSandboxSession,
   ZeishSandboxWaitOptions,
 } from './zeish-sandbox-client.types.js';
@@ -169,6 +170,28 @@ class EdgeSandboxSession implements ZeishSandboxSession {
     return runSandboxdCommand(input);
   }
 
+  async isDataPlaneAvailable(): Promise<boolean> {
+    try {
+      await this.dataPlaneRequest('/health');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async screenshot(): Promise<Buffer> {
+    const response = await this.dataPlaneRequest('/screenshot');
+    return Buffer.from(await response.arrayBuffer());
+  }
+
+  async act(action: ZeishSandboxAction): Promise<void> {
+    await this.dataPlaneRequest('/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(toSandboxdAction(action)),
+    });
+  }
+
   getTerminalUrl(): Promise<ZeishTerminalUrlResponse> {
     return createZeishApi(this.config).getTerminalUrl(this.id);
   }
@@ -232,4 +255,16 @@ function isRetryableAccessError(error: unknown): boolean {
 
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function toSandboxdAction(action: ZeishSandboxAction): Record<string, unknown> {
+  if (action.type !== 'scroll') return action;
+  return {
+    type: action.type,
+    ...(action.x === undefined ? {} : { x: action.x }),
+    ...(action.y === undefined ? {} : { y: action.y }),
+    ...(action.amount === undefined ? {} : { amount: action.amount }),
+    ...(action.deltaX === undefined ? {} : { delta_x: action.deltaX }),
+    ...(action.deltaY === undefined ? {} : { delta_y: action.deltaY }),
+  };
 }
