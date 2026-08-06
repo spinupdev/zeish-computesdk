@@ -16,6 +16,7 @@ const sandbox = {
 
 describe('createZeishSandboxClient', () => {
   it('uses Edge control-plane and scoped data-plane credentials for an agent run', async () => {
+    const actions: Record<string, unknown>[] = [];
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation((url, init) => {
       const requestUrl = String(url);
       if (requestUrl.endsWith('/public/sandboxes')) {
@@ -54,13 +55,7 @@ describe('createZeishSandboxClient', () => {
           method: 'POST',
           headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
         });
-        expect(JSON.parse(String(init?.body))).toEqual({
-          type: 'scroll',
-          x: 32,
-          y: 48,
-          delta_x: 1,
-          delta_y: -2,
-        });
+        actions.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
         return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
       }
       throw new Error(`Unexpected request ${requestUrl}`);
@@ -80,11 +75,44 @@ describe('createZeishSandboxClient', () => {
 
     await session.files.writeText('work/input.txt', 'hello');
     await expect(session.files.readText('work/input.txt')).resolves.toBe('hello');
-    await expect(session.screenshot()).resolves.toEqual(Buffer.from([137, 80, 78, 71]));
-    await session.act({ type: 'scroll', x: 32, y: 48, deltaX: 1, deltaY: -2 });
+    await expect(session.desktop.screenshot()).resolves.toEqual(Buffer.from([137, 80, 78, 71]));
+    await session.desktop.move(32, 48);
+    await session.desktop.click({ x: 32, y: 48, button: 'left', clicks: 2 });
+    await session.desktop.scroll({ x: 32, y: 48, deltaX: 1, deltaY: -2 });
+    await session.desktop.type('hello');
+    await session.desktop.key('ENTER');
 
     expect(session.details()).toEqual(sandbox);
-    expect(fetch).toHaveBeenCalledTimes(6);
+    expect(actions).toEqual([
+      { type: 'move', x: 32, y: 48 },
+      { type: 'click', x: 32, y: 48, button: 'left', clicks: 2 },
+      { type: 'scroll', x: 32, y: 48, delta_x: 1, delta_y: -2 },
+      { type: 'type', text: 'hello' },
+      { type: 'key', key: 'ENTER' },
+    ]);
+    expect(fetch).toHaveBeenCalledTimes(10);
+  });
+
+  it('rejects an unsuccessful desktop action response', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation((url) => {
+      const requestUrl = String(url);
+      if (requestUrl.endsWith('/public/sandboxes/sandbox-1')) {
+        return Promise.resolve(new Response(JSON.stringify(sandbox), { status: 200 }));
+      }
+      if (requestUrl.endsWith('/public/sandboxes/sandbox-1/exec-access')) {
+        return Promise.resolve(new Response(JSON.stringify({
+          sandboxUrl: 'https://sandbox.example', sandboxRpcUrl: 'https://sandbox-rpc.example',
+          token: 'session-token', expiresAt: '2099-01-01T00:00:00.000Z',
+        }), { status: 200 }));
+      }
+      if (requestUrl === 'https://sandbox.example/action') {
+        return Promise.resolve(new Response(JSON.stringify({ success: false }), { status: 200 }));
+      }
+      throw new Error(`Unexpected request ${requestUrl}`);
+    });
+    const session = await createZeishSandboxClient({ apiKey: 'zeish_live_test', fetch }).get('sandbox-1');
+
+    await expect(session.desktop.key('ESC')).rejects.toThrow('unsuccessful response');
   });
 
   it('keeps sandbox-scoped lifecycle and snapshot actions on the session', async () => {

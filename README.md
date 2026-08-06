@@ -52,16 +52,18 @@ const result = await sandbox.run('node worker.js', {
   onStderr: writeRunLog,
 });
 await sandbox.files.writeText('/workspace/input.json', JSON.stringify(input));
-const png = await sandbox.screenshot();
-await sandbox.act({ type: 'click', x: 340, y: 210 });
+const png = await sandbox.desktop.screenshot();
+await sandbox.desktop.move(340, 210);
+await sandbox.desktop.click({ x: 340, y: 210 });
+await sandbox.desktop.type('hello');
+await sandbox.desktop.key('ENTER');
 await sandbox.destroy();
 ```
 
-`screenshot()` and `act()` call sandboxd's authenticated display endpoints.
-Use a desktop-capable template that exposes a compatible display: sandboxd's
-current input/capture implementation targets X11, so a Wayland-only template
-needs Xwayland enabled or sandboxd's Wayland backend before cursor control is
-available.
+`desktop` calls sandboxd's authenticated native Wayland display endpoints.
+It supports screenshots plus move, click, scroll, text, and named key actions
+through the desktop-agentd privilege boundary; X11 and Xwayland are not
+required.
 
 ## License
 

@@ -40,6 +40,7 @@ export interface ZeishSandboxClient {
 export interface ZeishSandboxSession {
   readonly id: string;
   readonly files: ZeishSandboxFiles;
+  readonly desktop: ZeishSandboxDesktop;
   details(): ZeishSandbox;
   refresh(): Promise<ZeishSandbox>;
   destroy(): Promise<ZeishSandbox>;
@@ -72,6 +73,17 @@ export interface ZeishSandboxFiles {
   stat(path: string): Promise<ZeishFileStat>;
   exists(path: string): Promise<boolean>;
   remove(path: string): Promise<void>;
+}
+
+/** Native Wayland desktop controls scoped to one sandbox session. */
+export interface ZeishSandboxDesktop {
+  screenshot(): Promise<Buffer>;
+  action(action: ZeishSandboxAction): Promise<void>;
+  move(x: number, y: number): Promise<void>;
+  click(input?: Omit<Extract<ZeishSandboxAction, { type: 'click' }>, 'type'>): Promise<void>;
+  scroll(input: Omit<Extract<ZeishSandboxAction, { type: 'scroll' }>, 'type'>): Promise<void>;
+  type(text: string): Promise<void>;
+  key(key: string): Promise<void>;
 }
 
 export interface ZeishSandboxWaitOptions {
