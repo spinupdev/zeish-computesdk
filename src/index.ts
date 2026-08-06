@@ -8,6 +8,7 @@ import type {
 } from '@computesdk/provider';
 import { runSandboxdCommand } from './sandboxd-grpc.js';
 import { createZeishApi, ZeishApiError } from './public-api.js';
+import { createZeishSandboxClient } from './zeish-sandbox-client.js';
 import type {
   ZeishConfig,
   ZeishFileList,
@@ -167,4 +168,6 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
 });
 
 export { createZeishApi, ZeishApiError } from './public-api.js';
+export { createZeishSandboxClient } from './zeish-sandbox-client.js';
+export type * from './zeish-sandbox-client.types.js';
 export type * from './zeish.types.js';
