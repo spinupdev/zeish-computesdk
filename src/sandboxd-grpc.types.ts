@@ -31,7 +31,7 @@ export interface SandboxdExecution {
 export interface RunSandboxdCommandInput {
   access: ZeishAccess;
   command: string;
-  options?: RunCommandOptions;
+  options?: RunCommandOptions & StreamCallbackOptions;
 }
 
 export interface StreamCallbackOptions {

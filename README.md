@@ -23,6 +23,43 @@ operation, while Zeish intentionally keeps those snapshot endpoints
 sandbox-scoped. Those two methods therefore remain unavailable through the
 provider; use Zeish REST for them.
 
+## First-party sandbox client
+
+`createZeishSandboxClient()` is the provider-neutral integration interface for
+agents such as Arin. It keeps Edge's control plane and sandboxd data plane
+together: create a sandbox, wait for scoped access, then use commands, files,
+lifecycle operations, logs, events, previews, and sandbox-scoped snapshots
+from one session object.
+
+```ts
+import { createZeishSandboxClient } from '@zeish/computesdk-provider';
+
+const edge = createZeishSandboxClient({
+  apiKey: process.env.ZEISH_API_KEY!,
+  defaultTemplateId: process.env.ARIN_SANDBOX_TEMPLATE!,
+});
+
+const sandbox = await edge.create({
+  name: `arin-run-${runId}`,
+  templateId: process.env.ARIN_SANDBOX_TEMPLATE!,
+  metadata: { arinRunId: runId, arinAgentId: agentId },
+});
+
+await sandbox.waitForAccess();
+const result = await sandbox.run('node worker.js', {
+  workingDirectory: '/workspace',
+  onStdout: writeRunLog,
+  onStderr: writeRunLog,
+});
+await sandbox.files.writeText('/workspace/input.json', JSON.stringify(input));
+await sandbox.destroy();
+```
+
+This client deliberately does not claim to provide mouse, keyboard, or
+screenshot control. Those operations require an authenticated browser-agent
+service inside the selected sandbox template; its API belongs to that agent,
+not to Edge's control-plane SDK.
+
 ## License
 
 MIT
