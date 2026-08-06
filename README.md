@@ -28,8 +28,8 @@ provider; use Zeish REST for them.
 `createZeishSandboxClient()` is the provider-neutral integration interface for
 agents such as Arin. It keeps Edge's control plane and sandboxd data plane
 together: create a sandbox, wait for scoped access, then use commands, files,
-lifecycle operations, logs, events, previews, and sandbox-scoped snapshots
-from one session object.
+lifecycle operations, logs, events, previews, sandbox-scoped snapshots, and
+guest display actions from one session object.
 
 ```ts
 import { createZeishSandboxClient } from '@zeish/computesdk-provider';
@@ -52,13 +52,16 @@ const result = await sandbox.run('node worker.js', {
   onStderr: writeRunLog,
 });
 await sandbox.files.writeText('/workspace/input.json', JSON.stringify(input));
+const png = await sandbox.screenshot();
+await sandbox.act({ type: 'click', x: 340, y: 210 });
 await sandbox.destroy();
 ```
 
-This client deliberately does not claim to provide mouse, keyboard, or
-screenshot control. Those operations require an authenticated browser-agent
-service inside the selected sandbox template; its API belongs to that agent,
-not to Edge's control-plane SDK.
+`screenshot()` and `act()` call sandboxd's authenticated display endpoints.
+Use a desktop-capable template that exposes a compatible display: sandboxd's
+current input/capture implementation targets X11, so a Wayland-only template
+needs Xwayland enabled or sandboxd's Wayland backend before cursor control is
+available.
 
 ## License
 

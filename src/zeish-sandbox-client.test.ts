@@ -46,6 +46,23 @@ describe('createZeishSandboxClient', () => {
       if (requestUrl === 'https://sandbox.example/files/download?path=work%2Finput.txt') {
         return Promise.resolve(new Response('hello', { status: 200 }));
       }
+      if (requestUrl === 'https://sandbox.example/screenshot') {
+        return Promise.resolve(new Response(new Uint8Array([137, 80, 78, 71]), { status: 200 }));
+      }
+      if (requestUrl === 'https://sandbox.example/action') {
+        expect(init).toMatchObject({
+          method: 'POST',
+          headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
+        });
+        expect(JSON.parse(String(init?.body))).toEqual({
+          type: 'scroll',
+          x: 32,
+          y: 48,
+          delta_x: 1,
+          delta_y: -2,
+        });
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
+      }
       throw new Error(`Unexpected request ${requestUrl}`);
     });
     const client = createZeishSandboxClient({
@@ -63,9 +80,11 @@ describe('createZeishSandboxClient', () => {
 
     await session.files.writeText('work/input.txt', 'hello');
     await expect(session.files.readText('work/input.txt')).resolves.toBe('hello');
+    await expect(session.screenshot()).resolves.toEqual(Buffer.from([137, 80, 78, 71]));
+    await session.act({ type: 'scroll', x: 32, y: 48, deltaX: 1, deltaY: -2 });
 
     expect(session.details()).toEqual(sandbox);
-    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(fetch).toHaveBeenCalledTimes(6);
   });
 
   it('keeps sandbox-scoped lifecycle and snapshot actions on the session', async () => {
