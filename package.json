@@ -17,11 +17,12 @@
     "proto"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --clean",
+    "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:generated-contracts": "node scripts/verify-generated-contracts.mjs",
-    "test:contract-release": "node scripts/verify-contract-release.mjs"
+    "test:contract-release": "node scripts/verify-contract-release.mjs",
+    "dev": "vite build --watch"
   },
   "dependencies": {
     "@computesdk/provider": "^1.0.28",
@@ -30,9 +31,10 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "tsup": "^8.3.5",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.4"
   },
   "keywords": [
     "computesdk",
