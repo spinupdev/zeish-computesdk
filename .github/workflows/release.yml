@@ -30,12 +30,17 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+# id-token: write is required for npm trusted publishing (OIDC).
+# contents: write keeps tag/release artifact uploads working.
 permissions:
   contents: write
+  id-token: write
 
 jobs:
+  # GitHub-hosted runners are required for npm OIDC trusted publishing.
+  # Blacksmith/self-hosted runners are not supported by npm for this flow.
   verify-and-pack:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       OPENAPI_GENERATOR_IMAGE: openapitools/openapi-generator-cli@sha256:338dc617d26fb4a515891dee8a5c345ad302e191c6010c6a1f77ed6f6ff7476a
@@ -51,6 +56,11 @@ jobs:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
+      - name: Ensure npm supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          node -v
+          npm -v
       - name: Resolve release version
         id: version
         env:
@@ -74,7 +84,8 @@ jobs:
       - name: Pack provider release artifact
         run: |
           mkdir -p release-artifacts/provider
-          npm pack --pack-destination release-artifacts/provider
+          # Skip lifecycle scripts here: validation already ran above.
+          npm pack --pack-destination release-artifacts/provider --ignore-scripts
       - name: Generate and validate REST language packages
         if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
         env:
@@ -103,7 +114,7 @@ jobs:
             sh -ec 'go get github.com/stretchr/testify/assert@v1.10.0 && go test ./...'
           pnpm test:generated-contracts -- rest
           mkdir -p release-artifacts/rest/{typescript,python,go,docs}
-          npm --prefix generated/typescript pack --pack-destination "$PWD/release-artifacts/rest/typescript"
+          npm --prefix generated/typescript pack --pack-destination "$PWD/release-artifacts/rest/typescript" --ignore-scripts
           docker run --rm -v "$PWD:/workspace" -w /workspace/generated/python python:3.12-slim \
             sh -ec 'pip install --no-cache-dir build >/dev/null && python -m build --outdir /workspace/release-artifacts/rest/python'
           tar -C generated/go -czf "release-artifacts/rest/go/zeish-edge-go-${SDK_VERSION}.tar.gz" .
@@ -121,26 +132,12 @@ jobs:
           name: zeish-rest-sdks
           path: release-artifacts/rest
           if-no-files-found: error
-      - name: Publish provider to npm
+      - name: Publish provider to npm (OIDC trusted publishing)
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_npm)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NPM_TOKEN secret is not set" >&2
-            exit 1
-          fi
-          npm publish release-artifacts/provider/*.tgz --access public
-      - name: Publish generated REST TypeScript client to npm
+        run: npm publish release-artifacts/provider/*.tgz --access public
+      - name: Publish generated REST TypeScript client to npm (OIDC trusted publishing)
         if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_npm)) }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NPM_TOKEN secret is not set" >&2
-            exit 1
-          fi
-          npm publish release-artifacts/rest/typescript/*.tgz --access public
+        run: npm publish release-artifacts/rest/typescript/*.tgz --access public
       - name: Publish generated REST Python client to PyPI
         if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_pypi)) }}
         env:
