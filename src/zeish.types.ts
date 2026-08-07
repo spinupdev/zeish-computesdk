@@ -176,10 +176,33 @@ export interface ZeishCreatePreviewCodeInput {
   ttl_seconds?: number;
 }
 
+/**
+ * Preview access returned by createPreviewCode (SDK-normalized camelCase).
+ *
+ * Edge public contract (snake_case): url, handoff_url, base_url, code, expires_at.
+ * Always use `baseUrl` + `headers` (or `token`) for server-to-server / CDP —
+ * never treat handoff `url` as an HTTP base.
+ */
 export interface ZeishPreviewCode {
+  /**
+   * Browser handoff URL (`/_depot/auth?code=…&return=…`).
+   * Open in a real browser only — not an HTTP base for fetch/Playwright.
+   */
   url: string;
+  /** JWT (machines:read, aud-bound). Prefer via `headers` or `?token=`. */
   code: string;
   expires_at: string;
+  /** Explicit alias of `url` (from Edge `handoff_url`). */
+  handoffUrl: string;
+  /**
+   * Clean preview origin from Edge `base_url`
+   * (`https://{machine}-{port}-tcp.{base}`).
+   */
+  baseUrl: string;
+  /** Same as `code`. */
+  token: string;
+  /** `Authorization: Bearer <token>` for fetch / connectOverCDP. */
+  headers: Record<string, string>;
 }
 
 export interface ZeishTerminalUrlResponse {

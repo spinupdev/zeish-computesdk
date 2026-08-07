@@ -114,7 +114,7 @@ describe("createZeishApi", () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
-          url: "https://p.example/",
+          url: "https://p.example/_depot/auth?code=x&return=%2F",
           code: "x",
           expires_at: "t",
         }),
@@ -131,5 +131,38 @@ describe("createZeishApi", () => {
 
     const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
     expect(body).toMatchObject({ port: 9222, ttl_seconds: 3600 });
+  });
+
+  it("maps Edge base_url / handoff_url into agent-safe baseUrl + headers", async () => {
+    const handoff =
+      "https://abc-9222-tcp.example.zei.sh/_depot/auth?code=jwt-token&return=%2F";
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          url: handoff,
+          handoff_url: handoff,
+          base_url: "https://abc-9222-tcp.example.zei.sh",
+          code: "jwt-token",
+          expires_at: "2026-01-01T00:00:00.000Z",
+        }),
+        { status: 200 },
+      ),
+    );
+    const api = createZeishApi({
+      apiKey: "zeish_live_test",
+      createIdempotencyKey: () => "request-1",
+      fetch,
+    });
+
+    const preview = await api.createPreviewCode("sb-1", { port: 9222 });
+
+    expect(preview.url).toBe(handoff);
+    expect(preview.handoffUrl).toBe(handoff);
+    expect(preview.baseUrl).toBe("https://abc-9222-tcp.example.zei.sh");
+    expect(preview.token).toBe("jwt-token");
+    expect(preview.headers).toEqual({
+      Authorization: "Bearer jwt-token",
+      Accept: "application/json",
+    });
   });
 });

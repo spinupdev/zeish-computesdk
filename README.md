@@ -95,6 +95,14 @@ const preview = await api.createPreviewCode(sandbox.id, {
   port: CHROME_CDP_PORT,
   ttl_seconds: PREVIEW_CODE_TTL_AGENT,
 });
+
+// Edge returns base_url + handoff_url; SDK exposes baseUrl + headers.
+// Agents / Playwright: never use preview.url as an HTTP base.
+const version = await fetch(`${preview.baseUrl}/json/version`, {
+  headers: preview.headers,
+});
+// or: fetchPreviewJsonVersion(preview)
+// connectOverCDP(wsUrl, { headers: preview.headers })
 ```
 
 | Rule | Helper / constant |
@@ -103,6 +111,19 @@ const preview = await api.createPreviewCode(sandbox.id, {
 | Terminal includes **`failed`** | `isTerminalSandboxStatus` |
 | Flaky create | `createAndStartSandbox` (destroy + retry) |
 | CDP port exposure | `exposedPorts: [CHROME_CDP_PORT]` |
+| Preview auth | Edge `base_url` + `code` → SDK `baseUrl` + `headers` |
+
+### Preview auth (Edge public API + proxyd)
+
+Contract source of truth: Edge `PreviewCode` (`base_url`, `handoff_url`, `code`).
+
+| Field / helper | Use |
+|---|---|
+| `preview.url` / `handoffUrl` | Open in a **browser** (single-use cookie handoff) |
+| `preview.baseUrl` | From Edge `base_url` — `/json/version` and other HTTP paths |
+| `preview.headers` / `token` | `Authorization: Bearer` (HTTP) or `?token=` (WebSocket) |
+| `fetchPreviewJsonVersion(preview)` | Authenticated GET of Chrome `/json/version` |
+| `resolveCdpEndpoint({ preview, webSocketDebuggerUrl })` | Ready `wsUrl` + `headers` for Playwright |
 
 `ZeishApiError` exposes `code`, `details`, and `isValidationError` for structured Edge envelopes.
 

@@ -25,6 +25,7 @@ import type {
   ZeishVolume,
 } from "./zeish.types.js";
 import { clampPreviewTtlSeconds } from "./constants.js";
+import { normalizePreviewCode } from "./preview-access.js";
 
 /** Default Edge public API base (override with ZEISH_BASE_URL / config.baseUrl). */
 export const defaultBaseUrl = "https://api.dvito.cloud/api/v1";
@@ -181,13 +182,21 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
         config,
         `${sandboxPath(sandboxId)}/terminal-url`,
       ),
-    createPreviewCode: (sandboxId, input = {}) => {
+    createPreviewCode: async (sandboxId, input = {}) => {
       // Clamp ttl_seconds to Edge contract (1..PREVIEW_CODE_TTL_MAX) before send.
       const normalized: ZeishCreatePreviewCodeInput = {
         ...input,
         ttl_seconds: clampPreviewTtlSeconds(input.ttl_seconds),
       };
-      return request<ZeishPreviewCode>(
+      // Edge PreviewCode: url, handoff_url, base_url, code, expires_at.
+      // Normalize to camelCase + Bearer headers for agents.
+      const raw = await request<{
+        url: string;
+        code: string;
+        expires_at: string;
+        base_url?: string;
+        handoff_url?: string;
+      }>(
         config,
         `${sandboxPath(sandboxId)}/preview-codes`,
         mutation(config, {
@@ -195,6 +204,7 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
           body: JSON.stringify(normalized),
         }),
       );
+      return normalizePreviewCode(raw);
     },
     listLogs: (sandboxId, options: ZeishListLogsOptions = {}) =>
       request<ZeishLogEntry[]>(
