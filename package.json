@@ -22,7 +22,23 @@
     "test": "vitest run",
     "test:generated-contracts": "node scripts/verify-generated-contracts.mjs",
     "test:contract-release": "node scripts/verify-contract-release.mjs",
+    "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test",
     "dev": "vite build --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spinupdev/zeish-computesdk.git"
+  },
+  "homepage": "https://github.com/spinupdev/zeish-computesdk#readme",
+  "bugs": {
+    "url": "https://github.com/spinupdev/zeish-computesdk/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@computesdk/provider": "^1.0.28",

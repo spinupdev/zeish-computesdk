@@ -111,12 +111,12 @@ jobs:
           cp generated/python/README.md release-artifacts/rest/docs/python.md
           cp generated/go/README.md release-artifacts/rest/docs/go.md
       - uses: actions/upload-artifact@v4
-        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
         with:
           name: computesdk-provider
           path: release-artifacts/provider/*.tgz
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
+        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
         with:
           name: zeish-rest-sdks
           path: release-artifacts/rest
@@ -125,18 +125,32 @@ jobs:
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_npm)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish release-artifacts/provider/*.tgz --access public
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN secret is not set" >&2
+            exit 1
+          fi
+          npm publish release-artifacts/provider/*.tgz --access public
       - name: Publish generated REST TypeScript client to npm
         if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_npm)) }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish release-artifacts/rest/typescript/*.tgz --access public
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN secret is not set" >&2
+            exit 1
+          fi
+          npm publish release-artifacts/rest/typescript/*.tgz --access public
       - name: Publish generated REST Python client to PyPI
         if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_pypi)) }}
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
         run: |
+          if [ -z "$TWINE_PASSWORD" ]; then
+            echo "PYPI_TOKEN secret is not set" >&2
+            exit 1
+          fi
           docker run --rm \
             -e TWINE_USERNAME -e TWINE_PASSWORD \
             -v "$PWD/release-artifacts/rest/python:/artifacts" \
