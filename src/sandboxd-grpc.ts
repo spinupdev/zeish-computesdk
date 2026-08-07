@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { StringDecoder } from 'node:string_decoder';
 import * as grpc from '@grpc/grpc-js';
@@ -11,18 +13,48 @@ import type {
   StreamCallbackOptions,
 } from './sandboxd-grpc.types.js';
 
-const protoPath = fileURLToPath(new URL('../proto/sandboxd.proto', import.meta.url));
-const definition = protoLoader.loadSync(protoPath, {
-  keepCase: true,
-  longs: String,
-  enums: String,
-  defaults: true,
-  oneofs: true,
-});
-const packageDefinition = grpc.loadPackageDefinition(definition) as unknown as {
-  sandboxd: { v1: { SandboxdService: grpc.ServiceClientConstructor } };
+type SandboxdClient = grpc.Client & {
+  execStream(
+    request: SandboxdExecRequest,
+    metadata: grpc.Metadata
+  ): grpc.ClientReadableStream<SandboxdExecEvent>;
+  startExecution(
+    request: SandboxdExecRequest,
+    metadata: grpc.Metadata,
+    callback: (error: grpc.ServiceError | null, response: SandboxdExecution) => void
+  ): void;
 };
-const SandboxdService = packageDefinition.sandboxd.v1.SandboxdService;
+
+let SandboxdServiceCtor: grpc.ServiceClientConstructor | undefined;
+
+/** Resolve sandboxd.proto relative to this module (dist/) or package root. */
+function resolveProtoPath(): string {
+  const here = fileURLToPath(import.meta.url);
+  const candidates = [
+    join(dirname(here), '..', 'proto', 'sandboxd.proto'),
+    join(dirname(here), 'proto', 'sandboxd.proto'),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return candidates[0]!;
+}
+
+function getSandboxdService(): grpc.ServiceClientConstructor {
+  if (SandboxdServiceCtor) return SandboxdServiceCtor;
+  const definition = protoLoader.loadSync(resolveProtoPath(), {
+    keepCase: true,
+    longs: String,
+    enums: String,
+    defaults: true,
+    oneofs: true,
+  });
+  const packageDefinition = grpc.loadPackageDefinition(definition) as unknown as {
+    sandboxd: { v1: { SandboxdService: grpc.ServiceClientConstructor } };
+  };
+  SandboxdServiceCtor = packageDefinition.sandboxd.v1.SandboxdService;
+  return SandboxdServiceCtor;
+}
 
 function rpcAddress(url: string): string {
   return new URL(url).host;
@@ -32,20 +64,11 @@ export async function runSandboxdCommand(
   input: RunSandboxdCommandInput
 ): Promise<SandboxdCommandResult> {
   const startedAt = Date.now();
+  const SandboxdService = getSandboxdService();
   const client = new SandboxdService(
     rpcAddress(input.access.sandboxRpcUrl),
     grpc.credentials.createSsl()
-  ) as unknown as grpc.Client & {
-    execStream(
-      request: SandboxdExecRequest,
-      metadata: grpc.Metadata
-    ): grpc.ClientReadableStream<SandboxdExecEvent>;
-    startExecution(
-      request: SandboxdExecRequest,
-      metadata: grpc.Metadata,
-      callback: (error: grpc.ServiceError | null, response: SandboxdExecution) => void
-    ): void;
-  };
+  ) as unknown as SandboxdClient;
   const metadata = new grpc.Metadata();
   metadata.set('authorization', `Bearer ${input.access.token}`);
   const request: SandboxdExecRequest = {

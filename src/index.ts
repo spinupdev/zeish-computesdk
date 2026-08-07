@@ -185,6 +185,17 @@ export {
 } from './constants.js';
 
 export {
+  fetchPreviewJsonVersion,
+  normalizePreviewCode,
+  previewAuthHeaders,
+  previewOriginFromHandoffUrl,
+  resolveCdpEndpoint,
+  rewriteCdpWebSocketUrl,
+  withPreviewAccessToken,
+} from './preview-access.js';
+export type { ZeishPreviewCodeRaw } from './preview-access.js';
+
+export {
   isHealthySandboxStatus,
   isRunningSandboxStatus,
   isStartupSandboxStatus,
