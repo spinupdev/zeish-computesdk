@@ -74,7 +74,10 @@ jobs:
       - name: Set provider package version
         env:
           SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
-        run: npm version "$SDK_VERSION" --no-git-tag-version
+        run: |
+          # allow-same-version: package.json may already match the release input
+          # (e.g. workflow_dispatch with 0.1.0 when package.json is already 0.1.0).
+          npm version "$SDK_VERSION" --no-git-tag-version --allow-same-version
       - name: Install and validate provider
         run: |
           pnpm install --frozen-lockfile --prefer-offline
