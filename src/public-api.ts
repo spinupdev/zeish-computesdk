@@ -24,7 +24,9 @@ import type {
   ZeishTerminalUrlResponse,
   ZeishVolume,
 } from "./zeish.types.js";
+import { clampPreviewTtlSeconds } from "./constants.js";
 
+/** Default Edge public API base (override with ZEISH_BASE_URL / config.baseUrl). */
 export const defaultBaseUrl = "https://api.dvito.cloud/api/v1";
 
 export class ZeishApiError extends Error {
@@ -35,8 +37,24 @@ export class ZeishApiError extends Error {
     public readonly path: string,
     public readonly error?: ZeishPublicApiError,
   ) {
-    super(`Zeish API ${status} (${method} ${path}): ${body}`);
+    const message = error?.message
+      ? `Zeish API ${status} (${method} ${path}): ${error.message}`
+      : `Zeish API ${status} (${method} ${path}): ${body}`;
+    super(message);
     this.name = "ZeishApiError";
+  }
+
+  get code(): string | undefined {
+    return this.error?.code;
+  }
+
+  get details(): Record<string, unknown> | undefined {
+    return this.error?.details;
+  }
+
+  /** True when Edge rejected request shape (e.g. ttl_seconds too_big). */
+  get isValidationError(): boolean {
+    return this.status === 400 && this.error?.code === "invalid_request";
   }
 }
 
@@ -163,12 +181,21 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
         config,
         `${sandboxPath(sandboxId)}/terminal-url`,
       ),
-    createPreviewCode: (sandboxId, input = {}) =>
-      request<ZeishPreviewCode>(
+    createPreviewCode: (sandboxId, input = {}) => {
+      // Clamp ttl_seconds to Edge contract (1..PREVIEW_CODE_TTL_MAX) before send.
+      const normalized: ZeishCreatePreviewCodeInput = {
+        ...input,
+        ttl_seconds: clampPreviewTtlSeconds(input.ttl_seconds),
+      };
+      return request<ZeishPreviewCode>(
         config,
         `${sandboxPath(sandboxId)}/preview-codes`,
-        mutation(config, { method: "POST", body: JSON.stringify(input) }),
-      ),
+        mutation(config, {
+          method: "POST",
+          body: JSON.stringify(normalized),
+        }),
+      );
+    },
     listLogs: (sandboxId, options: ZeishListLogsOptions = {}) =>
       request<ZeishLogEntry[]>(
         config,

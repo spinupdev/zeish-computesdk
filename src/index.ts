@@ -171,3 +171,33 @@ export { createZeishApi, ZeishApiError } from './public-api.js';
 export { createZeishSandboxClient } from './zeish-sandbox-client.js';
 export type * from './zeish-sandbox-client.types.js';
 export type * from './zeish.types.js';
+
+export {
+  CHROME_CDP_PORT,
+  PREVIEW_CODE_TTL_AGENT,
+  PREVIEW_CODE_TTL_DEFAULT,
+  PREVIEW_CODE_TTL_MAX,
+  PREVIEW_CODE_TTL_MIN,
+  SANDBOX_ATTACH_MAX_ATTEMPTS,
+  SANDBOX_READY_POLL_MS,
+  SANDBOX_READY_TIMEOUT_MS,
+  clampPreviewTtlSeconds,
+} from './constants.js';
+
+export {
+  isHealthySandboxStatus,
+  isRunningSandboxStatus,
+  isStartupSandboxStatus,
+  isTerminalSandboxStatus,
+  normalizeSandboxStatus,
+} from './sandbox-status.js';
+
+export {
+  createAndStartSandbox,
+  destroySandboxBestEffort,
+  waitUntilRunning,
+} from './sandbox-lifecycle.js';
+export type {
+  CreateAndStartOptions,
+  WaitUntilRunningOptions,
+} from './sandbox-lifecycle.js';

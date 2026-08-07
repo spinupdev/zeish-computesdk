@@ -167,6 +167,12 @@ export type ZeishCreateSandboxInput = ZeishCreateSandboxOptions &
 export interface ZeishCreatePreviewCodeInput {
   port?: number;
   path?: string;
+  /**
+   * Preview code lifetime in seconds.
+   * Edge enforces 1..3600 (see PREVIEW_CODE_TTL_* in constants.ts).
+   * createZeishApi clamps out-of-range values; omit for default 300.
+   * Use PREVIEW_CODE_TTL_AGENT (3600) for long Playwright CDP sessions.
+   */
   ttl_seconds?: number;
 }
 

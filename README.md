@@ -65,6 +65,47 @@ It supports screenshots plus move, click, scroll, text, and named key actions
 through the desktop-agentd privilege boundary; X11 and Xwayland are not
 required.
 
+## Agent / CDP contracts (prevents common 400s)
+
+Helpers encode Edge rules so clients do not rediscover them:
+
+```ts
+import {
+  createZeishApi,
+  createAndStartSandbox,
+  waitUntilRunning,
+  isTerminalSandboxStatus,
+  PREVIEW_CODE_TTL_AGENT,
+  CHROME_CDP_PORT,
+  clampPreviewTtlSeconds,
+} from '@zeish/computesdk-provider';
+
+const api = createZeishApi({ apiKey: process.env.ZEISH_API_KEY! });
+
+// create → start → wait; destroy + retry on status failed
+const sandbox = await createAndStartSandbox(api, {
+  name: 'agent-run',
+  templateId: process.env.ZEISH_TEMPLATE_ID!,
+  exposedPorts: [CHROME_CDP_PORT], // 9222 for Chromium CDP
+  labels: { arin: '1' },
+});
+
+// ttl_seconds is clamped client-side to Edge max (1..3600)
+const preview = await api.createPreviewCode(sandbox.id, {
+  port: CHROME_CDP_PORT,
+  ttl_seconds: PREVIEW_CODE_TTL_AGENT,
+});
+```
+
+| Rule | Helper / constant |
+|---|---|
+| `ttl_seconds` 1..3600 | `clampPreviewTtlSeconds`, auto-clamp in `createPreviewCode` |
+| Terminal includes **`failed`** | `isTerminalSandboxStatus` |
+| Flaky create | `createAndStartSandbox` (destroy + retry) |
+| CDP port exposure | `exposedPorts: [CHROME_CDP_PORT]` |
+
+`ZeishApiError` exposes `code`, `details`, and `isValidationError` for structured Edge envelopes.
+
 ## License
 
 MIT

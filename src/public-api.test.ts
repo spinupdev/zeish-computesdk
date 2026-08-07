@@ -109,4 +109,27 @@ describe("createZeishApi", () => {
 
     await expect(api.deleteSnapshot("sandbox-1", "snapshot-1")).resolves.toBeUndefined();
   });
+
+  it("clamps createPreviewCode ttl_seconds to Edge max", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          url: "https://p.example/",
+          code: "x",
+          expires_at: "t",
+        }),
+        { status: 200 },
+      ),
+    );
+    const api = createZeishApi({
+      apiKey: "zeish_live_test",
+      createIdempotencyKey: () => "request-1",
+      fetch,
+    });
+
+    await api.createPreviewCode("sb-1", { port: 9222, ttl_seconds: 999_999 });
+
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body).toMatchObject({ port: 9222, ttl_seconds: 3600 });
+  });
 });
