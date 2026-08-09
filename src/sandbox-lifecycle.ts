@@ -114,10 +114,19 @@ export async function createAndStartSandbox(
       });
       createdId = created.id;
 
-      try {
-        await api.startSandbox(created.id);
-      } catch {
-        // Start may be implicit or already running.
+      // createSandbox already sets desiredStatus "running" and boots the
+      // machine on its own -- an explicit startSandbox() call landing while
+      // the machine is still mid-create races Edge's state machine and can
+      // kill the runtime outright (observed: instant "failed" with an empty
+      // "runtime terminal state: " lastError, reproduced by curl with no
+      // other client in the loop). Only call start for the case it's
+      // actually for: a sandbox that came back not already on its way up.
+      if (created.desiredStatus !== "running" && !isRunningSandboxStatus(created.status)) {
+        try {
+          await api.startSandbox(created.id);
+        } catch {
+          // Start may be implicit or already running.
+        }
       }
 
       return await waitUntilRunning(api, created.id, {
