@@ -86,7 +86,9 @@ const api = createZeishApi({ apiKey: process.env.ZEISH_API_KEY! });
 const sandbox = await createAndStartSandbox(api, {
   name: 'agent-run',
   templateId: process.env.ZEISH_TEMPLATE_ID!,
-  exposedPorts: [CHROME_CDP_PORT], // 9222 for Chromium CDP
+  ingress: [
+    { mode: 'raw_l4', protocol: 'tcp', internalPort: CHROME_CDP_PORT },
+  ], // 9222 for Chromium CDP
   labels: { arin: '1' },
 });
 
@@ -110,8 +112,11 @@ const version = await fetch(`${preview.baseUrl}/json/version`, {
 | `ttl_seconds` 1..3600 | `clampPreviewTtlSeconds`, auto-clamp in `createPreviewCode` |
 | Terminal includes **`failed`** | `isTerminalSandboxStatus` |
 | Flaky create | `createAndStartSandbox` (destroy + retry) |
-| CDP port exposure | `exposedPorts: [CHROME_CDP_PORT]` |
+| Generic ingress | `ingress: [{ mode: 'raw_l4', protocol: 'tcp', internalPort: CHROME_CDP_PORT }]` |
 | Preview auth | Edge `base_url` + `code` → SDK `baseUrl` + `headers` |
+
+`exposedPorts` remains accepted as a deprecated TCP-only shorthand and is
+translated to `raw_l4` ingress.
 
 ### Preview auth (Edge public API + proxyd)
 

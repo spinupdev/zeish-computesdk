@@ -69,6 +69,10 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
   methods: {
     sandbox: {
       create: async (config, options?: CreateSandboxOptions) => {
+        const ingressOptions = options as CreateSandboxOptions & {
+          ingress?: import('./zeish.types.js').ZeishIngress[];
+          exposedPorts?: number[];
+        };
         const templateId = options?.templateId ?? config.defaultTemplateId;
         if (!templateId) {
           throw new Error('Zeish requires a templateId. Pass sandbox.create({ templateId }) or set defaultTemplateId in the Zeish config.');
@@ -78,6 +82,8 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
           templateId,
           region: options?.region,
           metadata: options?.metadata,
+          ...(ingressOptions.ingress ? { ingress: ingressOptions.ingress } : {}),
+          ...(ingressOptions.exposedPorts ? { exposedPorts: ingressOptions.exposedPorts } : {}),
         });
         return { sandbox: managedSandbox(config, sandbox), sandboxId: sandbox.id };
       },
