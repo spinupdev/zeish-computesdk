@@ -43,6 +43,17 @@ export type ZeishSandboxStatus =
 
 export type ZeishSandboxDriver = "firecracker" | "cloud-hypervisor";
 
+/** Machine-backed ingress profile. TCP and UDP share the raw L4 policy. */
+export type ZeishIngressMode = "raw_l4";
+export type ZeishIngressProtocol = "tcp" | "udp";
+
+export interface ZeishIngress {
+  mode: ZeishIngressMode;
+  protocol: ZeishIngressProtocol;
+  internalPort: number;
+  externalPort?: number;
+}
+
 export interface ZeishSandbox {
   id: string;
   organizationId: string;
@@ -52,6 +63,7 @@ export interface ZeishSandbox {
   status: ZeishSandboxStatus;
   desiredStatus?: ZeishSandboxStatus;
   templateId?: string;
+  ingress?: ZeishIngress[];
   driver: ZeishSandboxDriver;
   region: string;
   previewUrl?: string;
@@ -155,6 +167,9 @@ export interface ZeishCreateSandboxOptions {
   createVolumes?: ZeishCreateSandboxVolumeInput[];
   labels?: Record<string, string>;
   metadata?: Record<string, string>;
+  /** Explicit generic ingress policy. Prefer this over exposedPorts. */
+  ingress?: ZeishIngress[];
+  /** @deprecated TCP-only shorthand; translated to raw_l4/tcp ingress. */
   exposedPorts?: number[];
   /**
    * Sent as the request's Idempotency-Key header. Without this, request()

@@ -51,6 +51,27 @@ describe("createZeishApi", () => {
     });
   });
 
+  it("sends explicit raw L4 ingress without route-type inference", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ id: "sandbox-1" }), { status: 201 }),
+    );
+    const api = createZeishApi({ apiKey: "zeish_live_test", fetch });
+
+    await api.createSandbox({
+      name: "UDP sandbox",
+      template: "base",
+      ingress: [
+        { mode: "raw_l4", protocol: "udp", internalPort: 27015 },
+      ],
+    });
+
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({
+      ingress: [
+        { mode: "raw_l4", protocol: "udp", internalPort: 27015 },
+      ],
+    });
+  });
+
   it("exposes the versioned template, network, and volume resource surface", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(() =>
       Promise.resolve(
