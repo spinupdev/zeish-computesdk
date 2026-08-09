@@ -156,6 +156,17 @@ export interface ZeishCreateSandboxOptions {
   labels?: Record<string, string>;
   metadata?: Record<string, string>;
   exposedPorts?: number[];
+  /**
+   * Sent as the request's Idempotency-Key header. Without this, request()
+   * mints a fresh random UUID per call (see idempotencyKey() in
+   * public-api.ts), which defeats Edge's server-side idempotency store:
+   * every retry — including a full re-attach after a crash — looks like a
+   * brand-new request and creates a duplicate sandbox. Pass a value that's
+   * stable across retries of the *same* logical create (e.g. a run id, or
+   * `${runId}:${attempt}` if you intentionally want a fresh resource per
+   * attempt).
+   */
+  idempotencyKey?: string;
 }
 
 export type ZeishCreateSandboxInput = ZeishCreateSandboxOptions &

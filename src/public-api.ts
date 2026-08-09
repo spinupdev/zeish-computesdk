@@ -128,10 +128,17 @@ function queryString(values: object): string {
   return encoded ? `?${encoded}` : "";
 }
 
-function mutation(config: ZeishConfig, init: RequestInit): RequestInit {
+function mutation(
+  config: ZeishConfig,
+  init: RequestInit,
+  overrideKey?: string,
+): RequestInit {
   return {
     ...init,
-    headers: { "Idempotency-Key": idempotencyKey(config), ...init.headers },
+    headers: {
+      "Idempotency-Key": overrideKey ?? idempotencyKey(config),
+      ...init.headers,
+    },
   };
 }
 
@@ -156,11 +163,15 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
     );
 
   return {
-    createSandbox: (input) =>
+    createSandbox: ({ idempotencyKey: key, ...input }) =>
       request<ZeishSandbox>(
         config,
         "/public/sandboxes",
-        mutation(config, { method: "POST", body: JSON.stringify(input) }),
+        mutation(
+          config,
+          { method: "POST", body: JSON.stringify(input) },
+          key,
+        ),
       ),
     listSandboxes: (options: ZeishPageOptions = {}) =>
       request<ZeishSandboxPage>(

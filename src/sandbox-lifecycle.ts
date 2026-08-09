@@ -99,7 +99,19 @@ export async function createAndStartSandbox(
         attempt === 1
           ? input.name
           : `${input.name}-r${attempt}`;
-      const created = await api.createSandbox({ ...input, name });
+      // Keyed per attempt (not just per input.idempotencyKey) so a genuine
+      // retry-with-a-fresh-machine after a failed attempt still creates a
+      // new one, while a raw transport retry of *this* attempt's HTTP call
+      // reuses it instead of creating a duplicate the caller never learns
+      // the id of.
+      const idempotencyKey = input.idempotencyKey
+        ? `${input.idempotencyKey}:attempt-${attempt}`
+        : undefined;
+      const created = await api.createSandbox({
+        ...input,
+        name,
+        idempotencyKey,
+      });
       createdId = created.id;
 
       try {
