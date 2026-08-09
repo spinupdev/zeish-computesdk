@@ -54,6 +54,30 @@ export interface ZeishIngress {
   externalPort?: number;
 }
 
+export interface ZeishService {
+  name?: string;
+  mode?: 'raw_l4';
+  protocol: ZeishIngressProtocol;
+  internal_port: number;
+  ports: Array<{ port: number; handlers?: string[] }>;
+  /** URL-based endpoint, when the transport has one. */
+  url?: string;
+  /** Native endpoint metadata for raw TCP/UDP transports. */
+  transport?: ZeishIngressProtocol;
+  host?: string;
+  port?: number;
+  access_policy?: 'private' | 'org' | 'public';
+  access_url?: string;
+  access_token?: string;
+  access_headers?: Record<string, string>;
+}
+
+export interface ZeishSandboxRuntime {
+  id: string;
+  state: string;
+  services?: ZeishService[] | null;
+}
+
 export interface ZeishSandbox {
   id: string;
   organizationId: string;
@@ -64,6 +88,7 @@ export interface ZeishSandbox {
   desiredStatus?: ZeishSandboxStatus;
   templateId?: string;
   ingress?: ZeishIngress[];
+  runtime?: ZeishSandboxRuntime | null;
   driver: ZeishSandboxDriver;
   region: string;
   previewUrl?: string;

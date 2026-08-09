@@ -118,6 +118,10 @@ const version = await fetch(`${preview.baseUrl}/json/version`, {
 `exposedPorts` remains accepted as a deprecated TCP-only shorthand and is
 translated to `raw_l4` ingress.
 
+Runtime services expose protocol-aware endpoints. HTTP/WebSocket services have
+`url`; native UDP services have `transport: 'udp'`, `host`, and `port` instead
+of an `https://...-udp...` URL.
+
 ### Preview auth (Edge public API + proxyd)
 
 Contract source of truth: Edge `PreviewCode` (`base_url`, `handoff_url`, `code`).
