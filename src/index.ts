@@ -71,7 +71,6 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
       create: async (config, options?: CreateSandboxOptions) => {
         const ingressOptions = options as CreateSandboxOptions & {
           ingress?: import('./zeish.types.js').ZeishIngress[];
-          exposedPorts?: number[];
         };
         const templateId = options?.templateId ?? config.defaultTemplateId;
         if (!templateId) {
@@ -83,7 +82,6 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
           region: options?.region,
           metadata: options?.metadata,
           ...(ingressOptions.ingress ? { ingress: ingressOptions.ingress } : {}),
-          ...(ingressOptions.exposedPorts ? { exposedPorts: ingressOptions.exposedPorts } : {}),
         });
         return { sandbox: managedSandbox(config, sandbox), sandboxId: sandbox.id };
       },

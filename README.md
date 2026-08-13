@@ -115,9 +115,6 @@ const version = await fetch(`${preview.baseUrl}/json/version`, {
 | Generic ingress | `ingress: [{ mode: 'raw_l4', protocol: 'tcp', internalPort: CHROME_CDP_PORT }]` |
 | Preview auth | Edge `base_url` + `code` → SDK `baseUrl` + `headers` |
 
-`exposedPorts` remains accepted as a deprecated TCP-only shorthand and is
-translated to `raw_l4` ingress.
-
 Runtime services expose protocol-aware endpoints. HTTP/WebSocket services have
 `url`; native UDP services have `transport: 'udp'`, `host`, and `port` instead
 of an `https://...-udp...` URL.

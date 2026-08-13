@@ -149,7 +149,7 @@ export interface ZeishTemplate {
   cpuCores: number;
   memoryMb: number;
   machineKind: "shared" | "dedicated";
-  exposedPorts: number[];
+  ingress: ZeishIngress[];
   iconUrl?: string;
   isPublic: boolean;
   scope: "global" | "organization";
@@ -192,10 +192,8 @@ export interface ZeishCreateSandboxOptions {
   createVolumes?: ZeishCreateSandboxVolumeInput[];
   labels?: Record<string, string>;
   metadata?: Record<string, string>;
-  /** Explicit generic ingress policy. Prefer this over exposedPorts. */
+  /** Explicit generic ingress policy for every exposed transport. */
   ingress?: ZeishIngress[];
-  /** @deprecated TCP-only shorthand; translated to raw_l4/tcp ingress. */
-  exposedPorts?: number[];
   /**
    * Sent as the request's Idempotency-Key header. Without this, request()
    * mints a fresh random UUID per call (see idempotencyKey() in
