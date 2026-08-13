@@ -176,6 +176,8 @@ export interface ZeishCreatePreviewCodeInput {
   ttl_seconds?: number;
 }
 
+export type ZeishPortAccessPolicy = "private" | "org" | "public";
+
 /**
  * Preview access returned by createPreviewCode (SDK-normalized camelCase).
  *
@@ -268,6 +270,11 @@ export interface ZeishPublicApi {
   createSandbox(input: ZeishCreateSandboxInput): Promise<ZeishSandbox>;
   listSandboxes(options?: ZeishPageOptions): Promise<ZeishSandboxPage>;
   getSandbox(sandboxId: string): Promise<ZeishSandbox>;
+  sharePort(
+    sandboxId: string,
+    port: number,
+    policy: ZeishPortAccessPolicy,
+  ): Promise<ZeishSandbox>;
   destroySandbox(sandboxId: string): Promise<ZeishSandbox>;
   getExecAccess(sandboxId: string): Promise<ZeishAccess>;
   getTerminalUrl(sandboxId: string): Promise<ZeishTerminalUrlResponse>;
