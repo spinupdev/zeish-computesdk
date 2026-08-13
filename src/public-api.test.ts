@@ -51,6 +51,29 @@ describe("createZeishApi", () => {
     });
   });
 
+  it("shares a sandbox port through the public API", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ id: "sandbox-1" }), { status: 200 }),
+      );
+    const api = createZeishApi({
+      apiKey: "zeish_live_test",
+      baseUrl: "https://edge.example/api/v1",
+      fetch,
+    });
+
+    await api.sharePort("sandbox-1", 8080, "public");
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://edge.example/api/v1/public/sandboxes/sandbox-1/ports/8080/share",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ policy: "public" }),
+      }),
+    );
+  });
+
   it("exposes the versioned template, network, and volume resource surface", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(() =>
       Promise.resolve(
@@ -107,7 +130,9 @@ describe("createZeishApi", () => {
       fetch,
     });
 
-    await expect(api.deleteSnapshot("sandbox-1", "snapshot-1")).resolves.toBeUndefined();
+    await expect(
+      api.deleteSnapshot("sandbox-1", "snapshot-1"),
+    ).resolves.toBeUndefined();
   });
 
   it("clamps createPreviewCode ttl_seconds to Edge max", async () => {

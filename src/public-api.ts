@@ -12,6 +12,7 @@ import type {
   ZeishOperationResult,
   ZeishPage,
   ZeishPageOptions,
+  ZeishPortAccessPolicy,
   ZeishPreviewCode,
   ZeishPublicApiError,
   ZeishPublicApiErrorResponse,
@@ -169,6 +170,15 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
       ),
     getSandbox: (sandboxId) =>
       request<ZeishSandbox>(config, sandboxPath(sandboxId)),
+    sharePort: (sandboxId, port, policy: ZeishPortAccessPolicy) =>
+      request<ZeishSandbox>(
+        config,
+        `${sandboxPath(sandboxId)}/ports/${port}/share`,
+        mutation(config, {
+          method: "PUT",
+          body: JSON.stringify({ policy }),
+        }),
+      ),
     destroySandbox: (sandboxId) =>
       request<ZeishSandbox>(
         config,
