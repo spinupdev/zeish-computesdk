@@ -1,6 +1,6 @@
 {
   "name": "@zeish/computesdk-provider",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ComputeSDK provider for Zeish sandboxes",
   "license": "MIT",
   "type": "module",
@@ -17,6 +17,7 @@
     "proto"
   ],
   "scripts": {
+    "prepare": "pnpm build",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
