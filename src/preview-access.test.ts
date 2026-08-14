@@ -7,7 +7,7 @@ import {
   resolveCdpEndpoint,
   rewriteCdpWebSocketUrl,
   withPreviewAccessToken,
-} from "./preview-access.js";
+} from "./preview-access";
 
 const HANDOFF =
   "https://55ca5fbe-6d11-4610-82bf-0451b2141462-9222-tcp.cbx-de-2.zei.sh/_depot/auth?code=eyJhbGciOiJFZERTQSJ9.x.y&return=%2F";

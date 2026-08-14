@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createZeishSandboxClient } from './zeish-sandbox-client.js';
+import { createZeishSandboxClient } from './zeish-sandbox-client';
 
 const sandbox = {
   id: 'sandbox-1',

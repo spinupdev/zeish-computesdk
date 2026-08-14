@@ -6,15 +6,19 @@ import type {
   RunCommandOptions,
   SandboxInfo,
 } from '@computesdk/provider';
-import { runSandboxdCommand } from './sandboxd-grpc.js';
-import { createZeishApi, ZeishApiError } from './public-api.js';
-import { createZeishSandboxClient } from './zeish-sandbox-client.js';
+import { runSandboxdCommand } from './sandboxd-grpc';
+import { createZeishApi, ZeishApiError } from './public-api';
+import { createZeishSandboxClient } from './zeish-sandbox-client';
 import type {
+  ZeishCreateSandboxOptions,
   ZeishConfig,
   ZeishFileList,
   ZeishFileStat,
   ZeishManagedSandbox,
-} from './zeish.types.js';
+} from './zeish.types';
+
+type ZeishProviderCreateSandboxOptions = CreateSandboxOptions &
+  Pick<ZeishCreateSandboxOptions, 'ingress'>;
 
 async function access(
   sandbox: ZeishManagedSandbox
@@ -53,13 +57,10 @@ function managedSandbox(
 async function listAllSandboxes(config: ZeishConfig): Promise<ZeishManagedSandbox[]> {
   const api = createZeishApi(config);
   const sandboxes: ZeishManagedSandbox[] = [];
-  let cursor: string | undefined;
 
-  do {
-    const page = await api.listSandboxes({ cursor, limit: 100 });
-    sandboxes.push(...page.data.map(sandbox => managedSandbox(config, sandbox)));
-    cursor = page.nextCursor ?? undefined;
-  } while (cursor);
+  for await (const sandbox of api.iterateSandboxes({ limit: 100 })) {
+    sandboxes.push(managedSandbox(config, sandbox));
+  }
 
   return sandboxes;
 }
@@ -69,6 +70,7 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
   methods: {
     sandbox: {
       create: async (config, options?: CreateSandboxOptions) => {
+        const ingress = (options as ZeishProviderCreateSandboxOptions | undefined)?.ingress;
         const templateId = options?.templateId ?? config.defaultTemplateId;
         if (!templateId) {
           throw new Error('Zeish requires a templateId. Pass sandbox.create({ templateId }) or set defaultTemplateId in the Zeish config.');
@@ -76,8 +78,9 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
         const sandbox = await createZeishApi(config).createSandbox({
           name: options?.name ?? 'Zeish sandbox',
           templateId,
-          region: options?.region,
-          metadata: options?.metadata,
+          ...(options?.region ? { region: options.region } : {}),
+          ...(options?.metadata ? { metadata: options.metadata } : {}),
+          ...(ingress ? { ingress } : {}),
         });
         return { sandbox: managedSandbox(config, sandbox), sandboxId: sandbox.id };
       },
@@ -96,7 +99,11 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
         await createZeishApi(config).destroySandbox(sandboxId);
       },
       runCommand: async (sandbox, command, options?: RunCommandOptions): Promise<CommandResult> =>
-        runSandboxdCommand({ access: await access(sandbox), command, options }),
+        runSandboxdCommand({
+          access: await access(sandbox),
+          command,
+          ...(options ? { options } : {}),
+        }),
       getInfo: async sandbox => ({
         id: sandbox.id,
         provider: 'zeish',
@@ -167,10 +174,12 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
   },
 });
 
-export { createZeishApi, ZeishApiError } from './public-api.js';
-export { createZeishSandboxClient } from './zeish-sandbox-client.js';
-export type * from './zeish-sandbox-client.types.js';
-export type * from './zeish.types.js';
+export { createZeishApi, ZeishApiError } from './public-api';
+export { FetchZeishTransport, createZeishTransport, withTransientRetry } from './transport';
+export { serializeSandboxAction } from './sandbox-actions';
+export { createZeishSandboxClient } from './zeish-sandbox-client';
+export type * from './zeish-sandbox-client.types';
+export type * from './zeish.types';
 
 export {
   CHROME_CDP_PORT,
@@ -182,7 +191,7 @@ export {
   SANDBOX_READY_POLL_MS,
   SANDBOX_READY_TIMEOUT_MS,
   clampPreviewTtlSeconds,
-} from './constants.js';
+} from './constants';
 
 export {
   fetchPreviewJsonVersion,
@@ -192,23 +201,25 @@ export {
   resolveCdpEndpoint,
   rewriteCdpWebSocketUrl,
   withPreviewAccessToken,
-} from './preview-access.js';
-export type { ZeishPreviewCodeRaw } from './preview-access.js';
+} from './preview-access';
+export type { ZeishPreviewCodeRaw } from './preview-access';
 
 export {
   isHealthySandboxStatus,
+  assertSandboxTransition,
+  canTransitionSandbox,
   isRunningSandboxStatus,
   isStartupSandboxStatus,
   isTerminalSandboxStatus,
   normalizeSandboxStatus,
-} from './sandbox-status.js';
+} from './sandbox-status';
 
 export {
   createAndStartSandbox,
   destroySandboxBestEffort,
   waitUntilRunning,
-} from './sandbox-lifecycle.js';
+} from './sandbox-lifecycle';
 export type {
   CreateAndStartOptions,
   WaitUntilRunningOptions,
-} from './sandbox-lifecycle.js';
+} from './sandbox-lifecycle';

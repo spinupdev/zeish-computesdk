@@ -11,7 +11,7 @@ import type {
   SandboxdExecEvent,
   SandboxdExecRequest,
   StreamCallbackOptions,
-} from './sandboxd-grpc.types.js';
+} from './sandboxd-grpc.types';
 
 type SandboxdClient = grpc.Client & {
   execStream(

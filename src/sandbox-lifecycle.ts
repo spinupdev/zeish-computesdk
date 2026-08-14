@@ -6,13 +6,14 @@ import {
   SANDBOX_ATTACH_MAX_ATTEMPTS,
   SANDBOX_READY_POLL_MS,
   SANDBOX_READY_TIMEOUT_MS,
-} from "./constants.js";
-import type { ZeishPublicApi } from "./zeish.types.js";
-import type { ZeishCreateSandboxInput, ZeishSandbox } from "./zeish.types.js";
+} from "./constants";
+import type { ZeishPublicApi } from "./zeish.types";
+import type { ZeishCreateSandboxInput, ZeishSandbox } from "./zeish.types";
 import {
+  assertSandboxTransition,
   isRunningSandboxStatus,
   isTerminalSandboxStatus,
-} from "./sandbox-status.js";
+} from "./sandbox-status";
 
 export interface WaitUntilRunningOptions {
   timeoutMs?: number;
@@ -91,26 +92,50 @@ export async function createAndStartSandbox(
     options.maxAttempts ?? SANDBOX_ATTACH_MAX_ATTEMPTS,
   );
   const errors: string[] = [];
+  let createAttempt = 1;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let createdId: string | undefined;
     try {
       const name =
-        attempt === 1
+        createAttempt === 1
           ? input.name
-          : `${input.name}-r${attempt}`;
-      const created = await api.createSandbox({ ...input, name });
+          : `${input.name}-r${createAttempt}`;
+      // Keep the key stable until create returns a sandbox. If the transport
+      // fails after the server accepted the request, the next call must
+      // recover that same sandbox instead of creating an unknown duplicate.
+      const idempotencyKey = input.idempotencyKey
+        ? `${input.idempotencyKey}:attempt-${createAttempt}`
+        : undefined;
+      const created = await api.createSandbox({
+        ...input,
+        name,
+        ...(idempotencyKey ? { idempotencyKey } : {}),
+      });
       createdId = created.id;
+      // A response established the sandbox identity, so a later readiness
+      // failure is an intentional replacement and may use a fresh key.
+      createAttempt++;
 
-      try {
-        await api.startSandbox(created.id);
-      } catch {
-        // Start may be implicit or already running.
+      // createSandbox already sets desiredStatus "running" and boots the
+      // machine on its own -- an explicit startSandbox() call landing while
+      // the machine is still mid-create races Edge's state machine and can
+      // kill the runtime outright (observed: instant "failed" with an empty
+      // "runtime terminal state: " lastError, reproduced by curl with no
+      // other client in the loop). Only call start for the case it's
+      // actually for: a sandbox that came back not already on its way up.
+      if (created.desiredStatus !== "running" && !isRunningSandboxStatus(created.status)) {
+        try {
+          assertSandboxTransition(created.status, 'start');
+          await api.startSandbox(created.id);
+        } catch {
+          // Start may be implicit or already running.
+        }
       }
 
       return await waitUntilRunning(api, created.id, {
-        timeoutMs: options.readyTimeoutMs,
-        pollIntervalMs: options.pollIntervalMs,
+        ...(options.readyTimeoutMs !== undefined ? { timeoutMs: options.readyTimeoutMs } : {}),
+        ...(options.pollIntervalMs !== undefined ? { pollIntervalMs: options.pollIntervalMs } : {}),
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

@@ -1,7 +1,7 @@
 import type {
   SandboxdCommandResult,
   StreamCallbackOptions,
-} from './sandboxd-grpc.types.js';
+} from './sandboxd-grpc.types';
 import type {
   ZeishAccess,
   ZeishConfig,
@@ -19,7 +19,8 @@ import type {
   ZeishSandboxPage,
   ZeishSnapshot,
   ZeishTerminalUrlResponse,
-} from './zeish.types.js';
+  ZeishMouseButton,
+} from './zeish.types';
 
 /** Options for a command executed in the sandbox data plane. */
 export interface ZeishSandboxCommandOptions extends StreamCallbackOptions {
@@ -105,7 +106,5 @@ export type ZeishSandboxAction =
       deltaX?: number;
       deltaY?: number;
     };
-
-export type ZeishMouseButton = 'left' | 'middle' | 'right' | 'back' | 'forward';
 
 export type ZeishSandboxClientConfig = ZeishConfig;

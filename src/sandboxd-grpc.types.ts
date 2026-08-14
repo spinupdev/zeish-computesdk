@@ -1,5 +1,5 @@
 import type { CommandResult, RunCommandOptions } from '@computesdk/provider';
-import type { ZeishAccess } from './zeish.types.js';
+import type { ZeishAccess } from './zeish.types';
 
 export interface SandboxdExecRequest {
   cmd: string[];

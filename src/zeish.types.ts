@@ -3,7 +3,13 @@ export interface ZeishConfig {
   baseUrl?: string;
   defaultTemplateId?: string;
   fetch?: typeof globalThis.fetch;
+  transport?: ZeishTransport;
   createIdempotencyKey?: () => string;
+}
+
+/** Strategy boundary for the Edge HTTP transport. */
+export interface ZeishTransport {
+  request(path: string, init?: RequestInit): Promise<Response>;
 }
 
 export type ZeishPublicApiErrorCode =
@@ -41,7 +47,50 @@ export type ZeishSandboxStatus =
   | "failed"
   | "destroyed";
 
+export type ZeishSandboxLifecycleAction =
+  | 'start'
+  | 'pause'
+  | 'resume'
+  | 'stop'
+  | 'kill'
+  | 'destroy';
+
 export type ZeishSandboxDriver = "firecracker" | "cloud-hypervisor";
+
+/** Machine-backed ingress profile. TCP and UDP share the raw L4 policy. */
+export type ZeishIngressMode = "raw_l4";
+export type ZeishIngressProtocol = "tcp" | "udp";
+
+export interface ZeishIngress {
+  mode: ZeishIngressMode;
+  protocol: ZeishIngressProtocol;
+  internalPort: number;
+  externalPort?: number;
+}
+
+export interface ZeishService {
+  name?: string;
+  mode?: 'raw_l4';
+  protocol: ZeishIngressProtocol;
+  internal_port: number;
+  ports: Array<{ port: number; handlers?: string[] }>;
+  /** URL-based endpoint, when the transport has one. */
+  url?: string;
+  /** Native endpoint metadata for raw TCP/UDP transports. */
+  transport?: ZeishIngressProtocol;
+  host?: string;
+  port?: number;
+  access_policy?: 'private' | 'org' | 'public';
+  access_url?: string;
+  access_token?: string;
+  access_headers?: Record<string, string>;
+}
+
+export interface ZeishSandboxRuntime {
+  id: string;
+  state: string;
+  services?: ZeishService[] | null;
+}
 
 export interface ZeishSandbox {
   id: string;
@@ -52,6 +101,8 @@ export interface ZeishSandbox {
   status: ZeishSandboxStatus;
   desiredStatus?: ZeishSandboxStatus;
   templateId?: string;
+  ingress?: ZeishIngress[];
+  runtime?: ZeishSandboxRuntime | null;
   driver: ZeishSandboxDriver;
   region: string;
   previewUrl?: string;
@@ -112,7 +163,7 @@ export interface ZeishTemplate {
   cpuCores: number;
   memoryMb: number;
   machineKind: "shared" | "dedicated";
-  exposedPorts: number[];
+  ingress: ZeishIngress[];
   iconUrl?: string;
   isPublic: boolean;
   scope: "global" | "organization";
@@ -155,8 +206,55 @@ export interface ZeishCreateSandboxOptions {
   createVolumes?: ZeishCreateSandboxVolumeInput[];
   labels?: Record<string, string>;
   metadata?: Record<string, string>;
-  exposedPorts?: number[];
+  /** Explicit generic ingress policy for every exposed transport. */
+  ingress?: ZeishIngress[];
+  /**
+   * Sent as the request's Idempotency-Key header. Without this, request()
+   * mints a fresh random UUID per call (see idempotencyKey() in
+   * public-api.ts), which defeats Edge's server-side idempotency store:
+   * every retry — including a full re-attach after a crash — looks like a
+   * brand-new request and creates a duplicate sandbox. Pass a value that's
+   * stable across retries of the *same* logical create (e.g. a run id, or
+   * `${runId}:${attempt}` if you intentionally want a fresh resource per
+   * attempt).
+   */
+  idempotencyKey?: string;
 }
+
+export interface ZeishPreviewCodeResponse {
+  url: string;
+  code: string;
+  expires_at: string;
+  base_url?: string;
+  handoff_url?: string;
+}
+
+export interface ZeishDesktopActionResponse {
+  success?: boolean;
+}
+
+export type ZeishMouseButton = 'left' | 'middle' | 'right' | 'back' | 'forward';
+
+/** Wire representation consumed by sandboxd's desktop action endpoint. */
+export interface ZeishSandboxdAction {
+  type: ZeishSandboxActionType;
+  x?: number;
+  y?: number;
+  button?: ZeishMouseButton;
+  clicks?: number;
+  text?: string;
+  key?: string;
+  amount?: number;
+  delta_x?: number;
+  delta_y?: number;
+}
+
+export type ZeishSandboxActionType =
+  | 'move'
+  | 'click'
+  | 'type'
+  | 'key'
+  | 'scroll';
 
 export type ZeishCreateSandboxInput = ZeishCreateSandboxOptions &
   (
@@ -269,6 +367,7 @@ export interface ZeishFileStat {
 export interface ZeishPublicApi {
   createSandbox(input: ZeishCreateSandboxInput): Promise<ZeishSandbox>;
   listSandboxes(options?: ZeishPageOptions): Promise<ZeishSandboxPage>;
+  iterateSandboxes(options?: ZeishPageOptions): AsyncIterable<ZeishSandbox>;
   getSandbox(sandboxId: string): Promise<ZeishSandbox>;
   sharePort(
     sandboxId: string,
