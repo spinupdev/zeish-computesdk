@@ -17,7 +17,7 @@
     "proto"
   ],
   "scripts": {
-    "prepare": "pnpm build",
+    "prepare": "vite build",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

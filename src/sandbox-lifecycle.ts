@@ -91,6 +91,7 @@ export async function createAndStartSandbox(
     options.maxAttempts ?? SANDBOX_ATTACH_MAX_ATTEMPTS,
   );
   const errors: string[] = [];
+  let createAttempt = 1;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let createdId: string | undefined;
@@ -99,13 +100,11 @@ export async function createAndStartSandbox(
         attempt === 1
           ? input.name
           : `${input.name}-r${attempt}`;
-      // Keyed per attempt (not just per input.idempotencyKey) so a genuine
-      // retry-with-a-fresh-machine after a failed attempt still creates a
-      // new one, while a raw transport retry of *this* attempt's HTTP call
-      // reuses it instead of creating a duplicate the caller never learns
-      // the id of.
+      // Keep the key stable until create returns a sandbox. If the transport
+      // fails after the server accepted the request, the next call must
+      // recover that same sandbox instead of creating an unknown duplicate.
       const idempotencyKey = input.idempotencyKey
-        ? `${input.idempotencyKey}:attempt-${attempt}`
+        ? `${input.idempotencyKey}:attempt-${createAttempt}`
         : undefined;
       const created = await api.createSandbox({
         ...input,
@@ -113,6 +112,9 @@ export async function createAndStartSandbox(
         idempotencyKey,
       });
       createdId = created.id;
+      // A response established the sandbox identity, so a later readiness
+      // failure is an intentional replacement and may use a fresh key.
+      createAttempt++;
 
       // createSandbox already sets desiredStatus "running" and boots the
       // machine on its own -- an explicit startSandbox() call landing while
