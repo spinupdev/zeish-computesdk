@@ -98,9 +98,9 @@ export async function createAndStartSandbox(
     let createdId: string | undefined;
     try {
       const name =
-        attempt === 1
+        createAttempt === 1
           ? input.name
-          : `${input.name}-r${attempt}`;
+          : `${input.name}-r${createAttempt}`;
       // Keep the key stable until create returns a sandbox. If the transport
       // fails after the server accepted the request, the next call must
       // recover that same sandbox instead of creating an unknown duplicate.

@@ -39,15 +39,24 @@ export function withTransientRetry(
       const method = (init.method ?? 'GET').toUpperCase();
       const retryable = method === 'GET' || method === 'HEAD';
       let response: Response | undefined;
+      let lastError: unknown;
 
       for (let attempt = 1; attempt <= (retryable ? attempts : 1); attempt++) {
-        response = await transport.request(path, init);
+        try {
+          response = await transport.request(path, init);
+        } catch (error) {
+          lastError = error;
+          if (!retryable || attempt === attempts) throw error;
+          await wait(delayMs * attempt);
+          continue;
+        }
         if (!retryable || !isTransient(response.status) || attempt === attempts) {
           return response;
         }
         await wait(delayMs * attempt);
       }
 
+      if (lastError !== undefined) throw lastError;
       return response!;
     },
   };

@@ -19,4 +19,14 @@ describe('transport strategies', () => {
       .resolves.toHaveProperty('status', 503);
     expect(request).toHaveBeenCalledTimes(1);
   });
+
+  it('retries thrown read failures', async () => {
+    const request = vi.fn()
+      .mockRejectedValueOnce(new Error('connection reset'))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    const transport = withTransientRetry({ request }, 3, 0);
+
+    await expect(transport.request('/sandboxes')).resolves.toHaveProperty('status', 200);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
 });

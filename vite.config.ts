@@ -47,6 +47,7 @@ export default defineConfig({
       include: ["src"],
       outDir: "dist",
       insertTypesEntry: true,
+      rollupTypes: true,
       tsconfigPath: resolve(root, "tsconfig.json"),
       exclude: ["src/**/*.test.ts"],
     }),
