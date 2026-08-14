@@ -10,6 +10,7 @@ import {
 import type { ZeishPublicApi } from "./zeish.types";
 import type { ZeishCreateSandboxInput, ZeishSandbox } from "./zeish.types";
 import {
+  assertSandboxTransition,
   isRunningSandboxStatus,
   isTerminalSandboxStatus,
 } from "./sandbox-status";
@@ -125,6 +126,7 @@ export async function createAndStartSandbox(
       // actually for: a sandbox that came back not already on its way up.
       if (created.desiredStatus !== "running" && !isRunningSandboxStatus(created.status)) {
         try {
+          assertSandboxTransition(created.status, 'start');
           await api.startSandbox(created.id);
         } catch {
           // Start may be implicit or already running.

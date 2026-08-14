@@ -57,13 +57,10 @@ function managedSandbox(
 async function listAllSandboxes(config: ZeishConfig): Promise<ZeishManagedSandbox[]> {
   const api = createZeishApi(config);
   const sandboxes: ZeishManagedSandbox[] = [];
-  let cursor: string | undefined;
 
-  do {
-    const page = await api.listSandboxes({ ...(cursor ? { cursor } : {}), limit: 100 });
-    sandboxes.push(...page.data.map(sandbox => managedSandbox(config, sandbox)));
-    cursor = page.nextCursor ?? undefined;
-  } while (cursor);
+  for await (const sandbox of api.iterateSandboxes({ limit: 100 })) {
+    sandboxes.push(managedSandbox(config, sandbox));
+  }
 
   return sandboxes;
 }
@@ -178,6 +175,8 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
 });
 
 export { createZeishApi, ZeishApiError } from './public-api';
+export { FetchZeishTransport, createZeishTransport, withTransientRetry } from './transport';
+export { serializeSandboxAction } from './sandbox-actions';
 export { createZeishSandboxClient } from './zeish-sandbox-client';
 export type * from './zeish-sandbox-client.types';
 export type * from './zeish.types';
@@ -207,6 +206,8 @@ export type { ZeishPreviewCodeRaw } from './preview-access';
 
 export {
   isHealthySandboxStatus,
+  assertSandboxTransition,
+  canTransitionSandbox,
   isRunningSandboxStatus,
   isStartupSandboxStatus,
   isTerminalSandboxStatus,

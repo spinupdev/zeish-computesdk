@@ -1,6 +1,7 @@
 import { runSandboxdCommand } from './sandboxd-grpc';
 import type { RunSandboxdCommandInput } from './sandboxd-grpc.types';
 import { ZeishApiError, createZeishApi } from './public-api';
+import { serializeSandboxAction } from './sandbox-actions';
 import type {
   ZeishSandboxClient,
   ZeishSandboxClientConfig,
@@ -200,7 +201,7 @@ class EdgeSandboxSession implements ZeishSandboxSession {
     const response = await this.dataPlaneRequest('/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(toSandboxdAction(action)),
+      body: JSON.stringify(serializeSandboxAction(action)),
     });
     const result = await response.json() as ZeishDesktopActionResponse;
     if (result.success !== true) {
@@ -271,16 +272,4 @@ function isRetryableAccessError(error: unknown): boolean {
 
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-function toSandboxdAction(action: ZeishSandboxAction): Record<string, unknown> {
-  if (action.type !== 'scroll') return action;
-  return {
-    type: action.type,
-    ...(action.x === undefined ? {} : { x: action.x }),
-    ...(action.y === undefined ? {} : { y: action.y }),
-    ...(action.amount === undefined ? {} : { amount: action.amount }),
-    ...(action.deltaX === undefined ? {} : { delta_x: action.deltaX }),
-    ...(action.deltaY === undefined ? {} : { delta_y: action.deltaY }),
-  };
 }

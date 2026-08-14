@@ -51,6 +51,29 @@ describe("createZeishApi", () => {
     });
   });
 
+  it('iterates through all sandbox pages lazily', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: [{ id: 'sandbox-1' }], nextCursor: 'page-2',
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: [{ id: 'sandbox-2' }], nextCursor: null,
+      }), { status: 200 }));
+    const api = createZeishApi({ apiKey: 'zeish_live_test', fetch });
+
+    const ids: string[] = [];
+    for await (const sandbox of api.iterateSandboxes({ limit: 1 })) {
+      ids.push(sandbox.id);
+    }
+
+    expect(ids).toEqual(['sandbox-1', 'sandbox-2']);
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      'https://api.dvito.cloud/api/v1/public/sandboxes?limit=1&cursor=page-2',
+      expect.anything(),
+    );
+  });
+
   it("sends explicit raw L4 ingress without route-type inference", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
       new Response(JSON.stringify({ id: "sandbox-1" }), { status: 201 }),

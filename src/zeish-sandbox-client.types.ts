@@ -19,6 +19,7 @@ import type {
   ZeishSandboxPage,
   ZeishSnapshot,
   ZeishTerminalUrlResponse,
+  ZeishMouseButton,
 } from './zeish.types';
 
 /** Options for a command executed in the sandbox data plane. */
@@ -105,7 +106,5 @@ export type ZeishSandboxAction =
       deltaX?: number;
       deltaY?: number;
     };
-
-export type ZeishMouseButton = 'left' | 'middle' | 'right' | 'back' | 'forward';
 
 export type ZeishSandboxClientConfig = ZeishConfig;

@@ -27,6 +27,7 @@ import type {
 } from "./zeish.types";
 import { clampPreviewTtlSeconds } from "./constants";
 import { normalizePreviewCode } from "./preview-access";
+import { createZeishTransport } from './transport';
 
 /** Default Edge public API base (override with ZEISH_BASE_URL / config.baseUrl). */
 export const defaultBaseUrl = "https://api.dvito.cloud/api/v1";
@@ -89,21 +90,16 @@ export async function request<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const fetchImpl = config.fetch ?? globalThis.fetch;
-  if (!fetchImpl)
-    throw new Error(
-      "A Fetch API implementation is required to use the Zeish public API.",
-    );
+  const transport = config.transport ?? createZeishTransport(config);
+  return parseResponse<T>(transport.request(path, init), path, init);
+}
 
-  const baseUrl = (config.baseUrl ?? defaultBaseUrl).replace(/\/+$/, "");
-  const response = await fetchImpl(`${baseUrl}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": config.apiKey,
-      ...init.headers,
-    },
-  });
+async function parseResponse<T>(
+  responsePromise: Response | Promise<Response>,
+  path: string,
+  init: RequestInit,
+): Promise<T> {
+  const response = await responsePromise;
 
   if (!response.ok) {
     const body = await response.text();
@@ -145,6 +141,9 @@ function mutation(
 
 /** Typed client for the versioned Edge public API. */
 export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
+  const transport = config.transport ?? createZeishTransport(config);
+  const apiRequest = <T>(path: string, init: RequestInit = {}) =>
+    parseResponse<T>(transport.request(path, init), path, init);
   const sandboxPath = (sandboxId: string) =>
     `/public/sandboxes/${encodeURIComponent(sandboxId)}`;
   const networkPath = (networkId: string) =>
@@ -157,16 +156,14 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
     sandboxId: string,
     action: "start" | "pause" | "resume" | "stop" | "kill",
   ) =>
-    request<ZeishSandbox>(
-      config,
+    apiRequest<ZeishSandbox>(
       `${sandboxPath(sandboxId)}/${action}`,
       mutation(config, { method: "POST" }),
     );
 
   return {
     createSandbox: ({ idempotencyKey: key, ...input }) =>
-      request<ZeishSandbox>(
-        config,
+      apiRequest<ZeishSandbox>(
         "/public/sandboxes",
         mutation(
           config,
@@ -175,23 +172,35 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
         ),
       ),
     listSandboxes: (options: ZeishPageOptions = {}) =>
-      request<ZeishSandboxPage>(
-        config,
+      apiRequest<ZeishSandboxPage>(
         `/public/sandboxes${queryString(options)}`,
       ),
+    async *iterateSandboxes(
+      options: ZeishPageOptions = {},
+    ): AsyncIterable<ZeishSandbox> {
+      let cursor = options.cursor;
+      do {
+        const page = await apiRequest<ZeishSandboxPage>(
+          `/public/sandboxes${queryString({
+            ...options,
+            ...(cursor ? { cursor } : {}),
+          })}`,
+        );
+        yield* page.data;
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+    },
     getSandbox: (sandboxId) =>
-      request<ZeishSandbox>(config, sandboxPath(sandboxId)),
+      apiRequest<ZeishSandbox>(sandboxPath(sandboxId)),
     destroySandbox: (sandboxId) =>
-      request<ZeishSandbox>(
-        config,
+      apiRequest<ZeishSandbox>(
         sandboxPath(sandboxId),
         mutation(config, { method: "DELETE" }),
       ),
     getExecAccess: (sandboxId) =>
-      request<ZeishAccess>(config, `${sandboxPath(sandboxId)}/exec-access`),
+      apiRequest<ZeishAccess>(`${sandboxPath(sandboxId)}/exec-access`),
     getTerminalUrl: (sandboxId) =>
-      request<ZeishTerminalUrlResponse>(
-        config,
+      apiRequest<ZeishTerminalUrlResponse>(
         `${sandboxPath(sandboxId)}/terminal-url`,
       ),
     createPreviewCode: async (sandboxId, input = {}) => {
@@ -202,8 +211,7 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
       };
       // Edge PreviewCode: url, handoff_url, base_url, code, expires_at.
       // Normalize to camelCase + Bearer headers for agents.
-      const raw = await request<ZeishPreviewCodeResponse>(
-        config,
+      const raw = await apiRequest<ZeishPreviewCodeResponse>(
         `${sandboxPath(sandboxId)}/preview-codes`,
         mutation(config, {
           method: "POST",
@@ -213,13 +221,11 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
       return normalizePreviewCode(raw);
     },
     listLogs: (sandboxId, options: ZeishListLogsOptions = {}) =>
-      request<ZeishLogEntry[]>(
-        config,
+      apiRequest<ZeishLogEntry[]>(
         `${sandboxPath(sandboxId)}/logs${queryString(options)}`,
       ),
     listEvents: (sandboxId, options: ZeishListEventsOptions = {}) =>
-      request<ZeishSandboxEvent[]>(
-        config,
+      apiRequest<ZeishSandboxEvent[]>(
         `${sandboxPath(sandboxId)}/events${queryString(options)}`,
       ),
     startSandbox: (sandboxId) => lifecycle(sandboxId, "start"),
@@ -228,8 +234,7 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
     stopSandbox: (sandboxId) => lifecycle(sandboxId, "stop"),
     killSandbox: (sandboxId) => lifecycle(sandboxId, "kill"),
     createSnapshot: (sandboxId, displayName) =>
-      request<ZeishSnapshot>(
-        config,
+      apiRequest<ZeishSnapshot>(
         `${sandboxPath(sandboxId)}/snapshots`,
         mutation(config, {
           method: "POST",
@@ -237,56 +242,48 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
         }),
       ),
     listSnapshots: (sandboxId) =>
-      request<ZeishSnapshot[]>(config, `${sandboxPath(sandboxId)}/snapshots`),
+      apiRequest<ZeishSnapshot[]>(`${sandboxPath(sandboxId)}/snapshots`),
     deleteSnapshot: (sandboxId, snapshotId) =>
-      request<ZeishOperationResult>(
-        config,
+      apiRequest<ZeishOperationResult>(
         `${sandboxPath(sandboxId)}/snapshots/${encodeURIComponent(snapshotId)}`,
         mutation(config, { method: "DELETE" }),
       ),
     createVolume: (input: ZeishCreateVolumeInput) =>
-      request<ZeishVolume>(
-        config,
+      apiRequest<ZeishVolume>(
         "/public/volumes",
         mutation(config, { method: "POST", body: JSON.stringify(input) }),
       ),
     listVolumes: (options: ZeishPageOptions = {}) =>
-      request<ZeishPage<ZeishVolume>>(
-        config,
+      apiRequest<ZeishPage<ZeishVolume>>(
         `/public/volumes${queryString(options)}`,
       ),
-    getVolume: (volumeId) => request<ZeishVolume>(config, volumePath(volumeId)),
+    getVolume: (volumeId) => apiRequest<ZeishVolume>(volumePath(volumeId)),
     deleteVolume: (volumeId) =>
-      request<ZeishVolume>(
-        config,
+      apiRequest<ZeishVolume>(
         volumePath(volumeId),
         mutation(config, { method: "DELETE" }),
       ),
     createNetwork: (input: ZeishCreateNetworkInput) =>
-      request<ZeishNetwork>(
-        config,
+      apiRequest<ZeishNetwork>(
         "/public/networks",
         mutation(config, { method: "POST", body: JSON.stringify(input) }),
       ),
     listNetworks: (options: ZeishPageOptions = {}) =>
-      request<ZeishPage<ZeishNetwork>>(
-        config,
+      apiRequest<ZeishPage<ZeishNetwork>>(
         `/public/networks${queryString(options)}`,
       ),
     getNetwork: (networkId) =>
-      request<ZeishNetwork>(config, networkPath(networkId)),
+      apiRequest<ZeishNetwork>(networkPath(networkId)),
     deleteNetwork: (networkId) =>
-      request<ZeishNetwork>(
-        config,
+      apiRequest<ZeishNetwork>(
         networkPath(networkId),
         mutation(config, { method: "DELETE" }),
       ),
     listTemplates: (options: ZeishPageOptions = {}) =>
-      request<ZeishPage<ZeishTemplate>>(
-        config,
+      apiRequest<ZeishPage<ZeishTemplate>>(
         `/public/templates${queryString(options)}`,
       ),
     getTemplate: (templateId) =>
-      request<ZeishTemplate>(config, templatePath(templateId)),
+      apiRequest<ZeishTemplate>(templatePath(templateId)),
   };
 }

@@ -3,7 +3,13 @@ export interface ZeishConfig {
   baseUrl?: string;
   defaultTemplateId?: string;
   fetch?: typeof globalThis.fetch;
+  transport?: ZeishTransport;
   createIdempotencyKey?: () => string;
+}
+
+/** Strategy boundary for the Edge HTTP transport. */
+export interface ZeishTransport {
+  request(path: string, init?: RequestInit): Promise<Response>;
 }
 
 export type ZeishPublicApiErrorCode =
@@ -40,6 +46,14 @@ export type ZeishSandboxStatus =
   | "destroying"
   | "failed"
   | "destroyed";
+
+export type ZeishSandboxLifecycleAction =
+  | 'start'
+  | 'pause'
+  | 'resume'
+  | 'stop'
+  | 'kill'
+  | 'destroy';
 
 export type ZeishSandboxDriver = "firecracker" | "cloud-hypervisor";
 
@@ -219,6 +233,29 @@ export interface ZeishDesktopActionResponse {
   success?: boolean;
 }
 
+export type ZeishMouseButton = 'left' | 'middle' | 'right' | 'back' | 'forward';
+
+/** Wire representation consumed by sandboxd's desktop action endpoint. */
+export interface ZeishSandboxdAction {
+  type: ZeishSandboxActionType;
+  x?: number;
+  y?: number;
+  button?: ZeishMouseButton;
+  clicks?: number;
+  text?: string;
+  key?: string;
+  amount?: number;
+  delta_x?: number;
+  delta_y?: number;
+}
+
+export type ZeishSandboxActionType =
+  | 'move'
+  | 'click'
+  | 'type'
+  | 'key'
+  | 'scroll';
+
 export type ZeishCreateSandboxInput = ZeishCreateSandboxOptions &
   (
     | { template: string; templateId?: string }
@@ -328,6 +365,7 @@ export interface ZeishFileStat {
 export interface ZeishPublicApi {
   createSandbox(input: ZeishCreateSandboxInput): Promise<ZeishSandbox>;
   listSandboxes(options?: ZeishPageOptions): Promise<ZeishSandboxPage>;
+  iterateSandboxes(options?: ZeishPageOptions): AsyncIterable<ZeishSandbox>;
   getSandbox(sandboxId: string): Promise<ZeishSandbox>;
   destroySandbox(sandboxId: string): Promise<ZeishSandbox>;
   getExecAccess(sandboxId: string): Promise<ZeishAccess>;

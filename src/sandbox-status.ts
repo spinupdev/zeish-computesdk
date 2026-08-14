@@ -2,7 +2,10 @@
  * Sandbox status helpers aligned with Edge ProductState + observed live values.
  */
 
-import type { ZeishSandboxStatus } from "./zeish.types";
+import type {
+  ZeishSandboxLifecycleAction,
+  ZeishSandboxStatus,
+} from "./zeish.types";
 
 /** Align with Edge ProductState (+ a few legacy aliases). */
 const TERMINAL_BAD = new Set([
@@ -23,6 +26,24 @@ const STARTUP = new Set([
   "provisioning",
   "resuming",
 ]);
+
+const ALLOWED_TRANSITIONS: Readonly<
+  Record<ZeishSandboxLifecycleAction, ReadonlySet<string>>
+> = {
+  start: new Set(['initialized', 'pending', 'stopped', 'paused']),
+  pause: new Set(['running']),
+  resume: new Set(['paused', 'stopped']),
+  stop: new Set(['running', 'paused', 'resuming']),
+  kill: new Set(['running', 'pausing', 'resuming', 'stopping']),
+  destroy: new Set([
+    'initialized',
+    'pending',
+    'running',
+    'paused',
+    'stopped',
+    'failed',
+  ]),
+};
 
 export function normalizeSandboxStatus(status: string): string {
   return status.trim().toLowerCase();
@@ -54,4 +75,22 @@ export function isHealthySandboxStatus(
   status: ZeishSandboxStatus | string,
 ): boolean {
   return isRunningSandboxStatus(status);
+}
+
+/** Returns whether Edge should accept a requested lifecycle transition. */
+export function canTransitionSandbox(
+  status: ZeishSandboxStatus | string,
+  action: ZeishSandboxLifecycleAction,
+): boolean {
+  return ALLOWED_TRANSITIONS[action].has(normalizeSandboxStatus(String(status)));
+}
+
+/** Fail early with a domain-specific error instead of making an invalid call. */
+export function assertSandboxTransition(
+  status: ZeishSandboxStatus | string,
+  action: ZeishSandboxLifecycleAction,
+): void {
+  if (!canTransitionSandbox(status, action)) {
+    throw new Error(`Cannot ${action} sandbox from status: ${status}`);
+  }
 }
