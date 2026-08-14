@@ -1,6 +1,6 @@
-import { runSandboxdCommand } from './sandboxd-grpc.js';
-import type { RunSandboxdCommandInput } from './sandboxd-grpc.types.js';
-import { ZeishApiError, createZeishApi } from './public-api.js';
+import { runSandboxdCommand } from './sandboxd-grpc';
+import type { RunSandboxdCommandInput } from './sandboxd-grpc.types';
+import { ZeishApiError, createZeishApi } from './public-api';
 import type {
   ZeishSandboxClient,
   ZeishSandboxClientConfig,
@@ -10,7 +10,7 @@ import type {
   ZeishSandboxDesktop,
   ZeishSandboxSession,
   ZeishSandboxWaitOptions,
-} from './zeish-sandbox-client.types.js';
+} from './zeish-sandbox-client.types';
 import type {
   ZeishAccess,
   ZeishCreatePreviewCodeInput,
@@ -28,7 +28,8 @@ import type {
   ZeishSandboxPage,
   ZeishSnapshot,
   ZeishTerminalUrlResponse,
-} from './zeish.types.js';
+  ZeishDesktopActionResponse,
+} from './zeish.types';
 
 const accessRefreshSkewMs = 30_000;
 const defaultAccessTimeoutMs = 5 * 60_000;
@@ -170,12 +171,12 @@ class EdgeSandboxSession implements ZeishSandboxSession {
       access: await this.getAccess(),
       command,
       options: {
-        timeout: options.timeoutMs,
-        env: options.environment,
-        cwd: options.workingDirectory,
-        background: options.background,
-        onStdout: options.onStdout,
-        onStderr: options.onStderr,
+        ...(options.timeoutMs !== undefined ? { timeout: options.timeoutMs } : {}),
+        ...(options.environment !== undefined ? { env: options.environment } : {}),
+        ...(options.workingDirectory !== undefined ? { cwd: options.workingDirectory } : {}),
+        ...(options.background !== undefined ? { background: options.background } : {}),
+        ...(options.onStdout !== undefined ? { onStdout: options.onStdout } : {}),
+        ...(options.onStderr !== undefined ? { onStderr: options.onStderr } : {}),
       },
     };
     return runSandboxdCommand(input);
@@ -201,7 +202,7 @@ class EdgeSandboxSession implements ZeishSandboxSession {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(toSandboxdAction(action)),
     });
-    const result = await response.json() as { success?: boolean };
+    const result = await response.json() as ZeishDesktopActionResponse;
     if (result.success !== true) {
       throw new Error('Zeish sandbox desktop action returned an unsuccessful response.');
     }

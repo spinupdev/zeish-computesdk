@@ -207,6 +207,18 @@ export interface ZeishCreateSandboxOptions {
   idempotencyKey?: string;
 }
 
+export interface ZeishPreviewCodeResponse {
+  url: string;
+  code: string;
+  expires_at: string;
+  base_url?: string;
+  handoff_url?: string;
+}
+
+export interface ZeishDesktopActionResponse {
+  success?: boolean;
+}
+
 export type ZeishCreateSandboxInput = ZeishCreateSandboxOptions &
   (
     | { template: string; templateId?: string }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createZeishApi } from "./public-api.js";
+import { createZeishApi } from "./public-api";
 
 describe("createZeishApi", () => {
   it("uses only first-party API-key authentication and idempotency for mutations", async () => {

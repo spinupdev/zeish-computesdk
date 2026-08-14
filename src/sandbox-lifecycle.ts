@@ -6,13 +6,13 @@ import {
   SANDBOX_ATTACH_MAX_ATTEMPTS,
   SANDBOX_READY_POLL_MS,
   SANDBOX_READY_TIMEOUT_MS,
-} from "./constants.js";
-import type { ZeishPublicApi } from "./zeish.types.js";
-import type { ZeishCreateSandboxInput, ZeishSandbox } from "./zeish.types.js";
+} from "./constants";
+import type { ZeishPublicApi } from "./zeish.types";
+import type { ZeishCreateSandboxInput, ZeishSandbox } from "./zeish.types";
 import {
   isRunningSandboxStatus,
   isTerminalSandboxStatus,
-} from "./sandbox-status.js";
+} from "./sandbox-status";
 
 export interface WaitUntilRunningOptions {
   timeoutMs?: number;
@@ -109,7 +109,7 @@ export async function createAndStartSandbox(
       const created = await api.createSandbox({
         ...input,
         name,
-        idempotencyKey,
+        ...(idempotencyKey ? { idempotencyKey } : {}),
       });
       createdId = created.id;
       // A response established the sandbox identity, so a later readiness
@@ -132,8 +132,8 @@ export async function createAndStartSandbox(
       }
 
       return await waitUntilRunning(api, created.id, {
-        timeoutMs: options.readyTimeoutMs,
-        pollIntervalMs: options.pollIntervalMs,
+        ...(options.readyTimeoutMs !== undefined ? { timeoutMs: options.readyTimeoutMs } : {}),
+        ...(options.pollIntervalMs !== undefined ? { pollIntervalMs: options.pollIntervalMs } : {}),
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

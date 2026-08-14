@@ -1,6 +1,6 @@
 {
   "name": "@zeish/computesdk-provider",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "ComputeSDK provider for Zeish sandboxes",
   "license": "MIT",
   "type": "module",
@@ -24,7 +24,8 @@
     "test:generated-contracts": "node scripts/verify-generated-contracts.mjs",
     "test:contract-release": "node scripts/verify-contract-release.mjs",
     "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test",
-    "dev": "vite build --watch"
+    "dev": "vite build --watch",
+    "check": "pnpm typecheck && pnpm test && pnpm build"
   },
   "repository": {
     "type": "git",
@@ -39,8 +40,10 @@
     "registry": "https://registry.npmjs.org/"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22",
+    "bun": ">=1.2"
   },
+  "packageManager": "pnpm@11.17.0",
   "dependencies": {
     "@computesdk/provider": "^1.0.28",
     "@grpc/grpc-js": "^1.14.3",

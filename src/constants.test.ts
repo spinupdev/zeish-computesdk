@@ -4,7 +4,7 @@ import {
   PREVIEW_CODE_TTL_MAX,
   PREVIEW_CODE_TTL_MIN,
   clampPreviewTtlSeconds,
-} from './constants.js';
+} from './constants';
 
 describe('clampPreviewTtlSeconds', () => {
   it('defaults when undefined', () => {

@@ -22,7 +22,7 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
     sourcemap: true,
-    target: "node20",
+    target: "node22",
     minify: false,
     lib: {
       entry: resolve(root, "src/index.ts"),

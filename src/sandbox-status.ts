@@ -2,7 +2,7 @@
  * Sandbox status helpers aligned with Edge ProductState + observed live values.
  */
 
-import type { ZeishSandboxStatus } from "./zeish.types.js";
+import type { ZeishSandboxStatus } from "./zeish.types";
 
 /** Align with Edge ProductState (+ a few legacy aliases). */
 const TERMINAL_BAD = new Set([

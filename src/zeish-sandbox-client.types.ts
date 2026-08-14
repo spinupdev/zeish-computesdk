@@ -1,7 +1,7 @@
 import type {
   SandboxdCommandResult,
   StreamCallbackOptions,
-} from './sandboxd-grpc.types.js';
+} from './sandboxd-grpc.types';
 import type {
   ZeishAccess,
   ZeishConfig,
@@ -19,7 +19,7 @@ import type {
   ZeishSandboxPage,
   ZeishSnapshot,
   ZeishTerminalUrlResponse,
-} from './zeish.types.js';
+} from './zeish.types';
 
 /** Options for a command executed in the sandbox data plane. */
 export interface ZeishSandboxCommandOptions extends StreamCallbackOptions {

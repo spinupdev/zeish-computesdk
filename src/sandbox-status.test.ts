@@ -3,7 +3,7 @@ import {
   isRunningSandboxStatus,
   isStartupSandboxStatus,
   isTerminalSandboxStatus,
-} from './sandbox-status.js';
+} from './sandbox-status';
 
 describe('sandbox status helpers', () => {
   it('treats failed as terminal', () => {
