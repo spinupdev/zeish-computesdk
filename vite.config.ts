@@ -47,20 +47,14 @@ export default defineConfig({
       include: ["src"],
       outDir: "dist",
       insertTypesEntry: true,
-      // rollupTypes: true (rollup-plugin-dts's single-file bundling pass)
-      // reproducibly scrambled export names in GitHub Actions CI —
-      // consumers saw e.g. "'ZeishConfig' declared locally, but exported as
-      // 'assertSandboxTransition'" — while never failing locally or in a
-      // clean Docker build on the same Node/pnpm versions, across many
-      // repeated attempts on both a full monorepo install and a standalone
-      // build. That split (100% CI failure, 0% reproduction anywhere else)
-      // points at a resource-constrained-runner flakiness class in
-      // rollup-plugin-dts's bundling rather than anything in this repo.
-      // insertTypesEntry still emits a single dist/index.d.ts, just one
-      // that re-exports the per-module declarations rollup-plugin-dts
-      // would otherwise have bundled — same public surface, without the
-      // flaky bundling pass.
-      rollupTypes: false,
+      // Must stay true: per-file output (rollupTypes: false) makes
+      // insertTypesEntry's index.d.ts re-export sibling files with
+      // extension-less relative specifiers ("./zeish.types"), which
+      // "moduleResolution": "NodeNext" consumers (e.g. arin) cannot
+      // resolve at all — every named export disappears. Bundling into one
+      // file removes the internal relative imports entirely, sidestepping
+      // that entirely.
+      rollupTypes: true,
       tsconfigPath: resolve(root, "tsconfig.json"),
       exclude: ["src/**/*.test.ts"],
     }),
