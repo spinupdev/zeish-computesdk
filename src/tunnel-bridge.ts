@@ -127,6 +127,7 @@ function pipeSocketToTunnel(
   // Bytes the local client sends before the tunnel WS finishes connecting
   // must not be dropped.
   const pending: Buffer[] = alreadyRead && alreadyRead.length > 0 ? [alreadyRead] : [];
+  let pendingBytes = pending.reduce((n, b) => n + b.length, 0);
   let ready = false;
 
   // Without this, a fast local sender (a bulk-transfer use case like a
@@ -134,8 +135,11 @@ function pipeSocketToTunnel(
   // ws.send() calls as fast as the socket delivers "data" events, with
   // nothing pausing the source when proxyd/the sandbox drains slower than
   // that. The queue grows unbounded and can exhaust the process's memory.
+  // Before the tunnel WS opens there's nothing to send to yet, so the same
+  // watermarks gate `pending` itself — a slow/stalled tunnel handshake must
+  // pause the local socket exactly like a slow drain does once open.
   const backpressure = createBackpressureController({
-    getBufferedAmount: () => ws.bufferedAmount,
+    getBufferedAmount: () => (ready ? ws.bufferedAmount : pendingBytes),
     isOpen: () => ws.readyState === WebSocket.OPEN,
     pause: () => socket.pause(),
     resume: () => socket.resume(),
@@ -145,19 +149,47 @@ function pipeSocketToTunnel(
   socket.on("data", (chunk: Buffer) => {
     if (ready) {
       ws.send(chunk);
-      backpressure.check();
     } else {
       pending.push(chunk);
+      pendingBytes += chunk.length;
     }
+    backpressure.check();
   });
   ws.addEventListener("open", () => {
     ready = true;
     for (const chunk of pending) ws.send(chunk);
     pending.length = 0;
+    pendingBytes = 0;
     backpressure.check();
   });
+
+  // socket.write() queues internally in userspace when the local reader is
+  // slow, same unbounded-growth risk as the outbound direction above — but
+  // the native WebSocket has no way to pause delivery of "message" events,
+  // so this can only gate how fast queued bytes are handed to the socket,
+  // not how fast they arrive. Still worth doing: without checking write()'s
+  // return value, Node would silently accumulate every queued write in its
+  // own internal buffer with no back-off at all.
+  const downstreamQueue: Buffer[] = [];
+  let downstreamDraining = false;
+  const flushDownstream = () => {
+    while (downstreamQueue.length > 0) {
+      const chunk = downstreamQueue[0]!;
+      const ok = socket.write(chunk);
+      downstreamQueue.shift();
+      if (!ok) {
+        downstreamDraining = true;
+        socket.once("drain", () => {
+          downstreamDraining = false;
+          flushDownstream();
+        });
+        return;
+      }
+    }
+  };
   ws.addEventListener("message", (event) => {
-    socket.write(toBuffer(event.data));
+    downstreamQueue.push(toBuffer(event.data));
+    if (!downstreamDraining) flushDownstream();
   });
 
   const closeBoth = () => {

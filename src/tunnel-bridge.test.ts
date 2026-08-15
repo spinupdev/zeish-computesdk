@@ -34,6 +34,7 @@ function startMockTunnelServer(
     onMessage(cb: (data: Buffer) => void): void;
     close(): void;
   }) => void,
+  options: { handshakeDelayMs?: number } = {},
 ): Promise<{ url: string; close(): Promise<void> }> {
   const server = http.createServer();
   server.on("upgrade", (req, socket) => {
@@ -51,7 +52,7 @@ function startMockTunnelServer(
       ...(protocol ? [`Sec-WebSocket-Protocol: ${protocol}`] : []),
       "\r\n",
     ].join("\r\n");
-    socket.write(headers);
+    setTimeout(() => socket.write(headers), options.handshakeDelayMs ?? 0);
 
     const send = (data: Buffer) => {
       // Unmasked server->client binary frame; small-payload framing only
@@ -237,6 +238,79 @@ describe("createTunnelBridge", () => {
     expect(bridge.httpUrl).toBe(`http://[::1]:${bridge.localPort}`);
   });
 
+  it("delivers bytes written before the tunnel handshake completes, in order and without loss", async () => {
+    const received: Buffer[] = [];
+    const mock = await startMockTunnelServer(
+      (conn) => {
+        conn.onMessage((data) => received.push(data));
+      },
+      { handshakeDelayMs: 50 },
+    );
+    cleanups.push(mock.close);
+
+    const bridge = await createTunnelBridge(access(mock.url), 5432);
+    cleanups.push(bridge.close);
+
+    const client = net.connect(bridge.localPort, bridge.localHost);
+    await new Promise<void>((resolve) => client.once("connect", resolve));
+    // Written immediately after connect, well before the delayed WS
+    // handshake resolves — must be queued (not dropped) and forwarded once
+    // the tunnel opens.
+    client.write("part-1;");
+    client.write("part-2;");
+    cleanups.push(() => {
+      client.end();
+      return Promise.resolve();
+    });
+
+    await vi.waitFor(() => {
+      expect(Buffer.concat(received).toString()).toBe("part-1;part-2;");
+    });
+  });
+
+  it("delivers bytes to a slow local reader without loss when the socket applies backpressure", async () => {
+    const mock = await startMockTunnelServer((conn) => {
+      conn.onMessage((data) => conn.send(data));
+    });
+    cleanups.push(mock.close);
+
+    const bridge = await createTunnelBridge(access(mock.url), 5432);
+    cleanups.push(bridge.close);
+
+    // Kept under the mock server's single-frame length limit (its `send`
+    // helper only implements the 7-bit/16-bit WS length forms); large
+    // enough on loopback to make `socket.write()` on the bridge's local
+    // side return false at least once against a deliberately slow reader.
+    const chunk = Buffer.alloc(60 * 1024, "x");
+
+    const received = await new Promise<Buffer>((resolve, reject) => {
+      const client = net.connect(bridge.localPort, bridge.localHost, () => {
+        client.write(chunk);
+      });
+      const parts: Buffer[] = [];
+      let total = 0;
+      client.pause();
+      // Simulate a slow reader: only resume briefly, on an interval, so the
+      // echoed response can't drain as fast as it arrives.
+      const resumer = setInterval(() => {
+        client.resume();
+        setTimeout(() => client.pause(), 5);
+      }, 15);
+      client.on("data", (data: Buffer) => {
+        parts.push(data);
+        total += data.length;
+        if (total >= chunk.length) {
+          clearInterval(resumer);
+          resolve(Buffer.concat(parts));
+          client.end();
+        }
+      });
+      client.once("error", reject);
+    });
+
+    expect(received.length).toBe(chunk.length);
+    expect(received.equals(chunk)).toBe(true);
+  }, 10_000);
 });
 
 describe("createBackpressureController", () => {
