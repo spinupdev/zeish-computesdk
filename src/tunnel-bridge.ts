@@ -140,7 +140,15 @@ function pipeSocketToTunnel(
   // pause the local socket exactly like a slow drain does once open.
   const backpressure = createBackpressureController({
     getBufferedAmount: () => (ready ? ws.bufferedAmount : pendingBytes),
-    isOpen: () => ws.readyState === WebSocket.OPEN,
+    // Only CLOSING/CLOSED means "give up and resume regardless of
+    // watermark" — CONNECTING is not that. Treating CONNECTING as closed
+    // (the strict `=== OPEN` check this used to be) made the drain-timer
+    // resume a paused source every ~20ms *during* a slow handshake, since
+    // a not-yet-open destination isn't OPEN either; that let a fast local
+    // sender keep re-filling `pending` past the high watermark for as long
+    // as the handshake took, the exact unbounded growth this backpressure
+    // controller exists to prevent.
+    isOpen: () => ws.readyState !== WebSocket.CLOSING && ws.readyState !== WebSocket.CLOSED,
     pause: () => socket.pause(),
     resume: () => socket.resume(),
     isPaused: () => socket.isPaused(),
@@ -163,19 +171,46 @@ function pipeSocketToTunnel(
     backpressure.check();
   });
 
+  const closeBoth = () => {
+    backpressure.dispose();
+    socket.destroy();
+    try {
+      ws.close();
+    } catch {
+      /* already closed */
+    }
+  };
+
   // socket.write() queues internally in userspace when the local reader is
   // slow, same unbounded-growth risk as the outbound direction above — but
-  // the native WebSocket has no way to pause delivery of "message" events,
-  // so this can only gate how fast queued bytes are handed to the socket,
-  // not how fast they arrive. Still worth doing: without checking write()'s
-  // return value, Node would silently accumulate every queued write in its
-  // own internal buffer with no back-off at all.
+  // the native WebSocket has no way to pause delivery of "message" events
+  // (there's no equivalent of TCP's pause()/resume() on the receiving
+  // side), so checking write()'s return value only gates how fast queued
+  // bytes are handed to the socket, not how fast they arrive. A sandbox
+  // sending faster than the local reader drains would otherwise still grow
+  // downstreamQueue without bound — the same failure this was meant to
+  // fix, just relocated from Node's internal writable buffer into this
+  // array. Cap it: past the watermark there is no graceful option left
+  // (the tunnel can't be told to slow down), so terminate the connection
+  // rather than exhaust memory.
   const downstreamQueue: Buffer[] = [];
+  let downstreamQueueBytes = 0;
   let downstreamDraining = false;
+  // "end" once the tail has drained (a clean tunnel close — the remote
+  // side is done sending, nothing more will arrive) vs "destroy" (an
+  // abrupt/error close — still worth flushing whatever already arrived,
+  // but don't wait around for more).
+  let pendingTeardown: "end" | "destroy" | null = null;
+  const finishIfDrained = () => {
+    if (!pendingTeardown || downstreamQueue.length > 0 || downstreamDraining) return;
+    if (pendingTeardown === "destroy") socket.destroy();
+    else socket.end();
+  };
   const flushDownstream = () => {
     while (downstreamQueue.length > 0) {
       const chunk = downstreamQueue[0]!;
       const ok = socket.write(chunk);
+      downstreamQueueBytes -= chunk.length;
       downstreamQueue.shift();
       if (!ok) {
         downstreamDraining = true;
@@ -186,25 +221,35 @@ function pipeSocketToTunnel(
         return;
       }
     }
+    finishIfDrained();
   };
   ws.addEventListener("message", (event) => {
-    downstreamQueue.push(toBuffer(event.data));
+    const chunk = toBuffer(event.data);
+    downstreamQueue.push(chunk);
+    downstreamQueueBytes += chunk.length;
+    if (downstreamQueueBytes > WS_SEND_HIGH_WATERMARK) {
+      closeBoth();
+      return;
+    }
     if (!downstreamDraining) flushDownstream();
   });
 
-  const closeBoth = () => {
-    backpressure.dispose();
-    socket.destroy();
-    try {
-      ws.close();
-    } catch {
-      /* already closed */
-    }
-  };
   socket.once("close", closeBoth);
   socket.once("error", closeBoth);
-  ws.addEventListener("close", () => socket.end());
-  ws.addEventListener("error", () => socket.destroy());
+  // Tearing down the local socket immediately on tunnel close/error would
+  // truncate whatever's still sitting in downstreamQueue (or mid-flight in
+  // Node's own writable buffer) — the tail of exactly the bulk transfer
+  // this queue exists to handle. Defer until the queue has actually
+  // drained; flushDownstream calls finishIfDrained itself once it empties,
+  // covering the case where draining finishes after these fire.
+  ws.addEventListener("close", () => {
+    pendingTeardown = "end";
+    finishIfDrained();
+  });
+  ws.addEventListener("error", () => {
+    pendingTeardown = "destroy";
+    finishIfDrained();
+  });
 
   return { close: closeBoth };
 }

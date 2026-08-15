@@ -38,6 +38,11 @@ function startMockTunnelServer(
 ): Promise<{ url: string; close(): Promise<void> }> {
   const server = http.createServer();
   server.on("upgrade", (req, socket) => {
+    // A test client that terminates the connection (e.g. the bridge closing
+    // it once a watermark trips) can leave a write in flight on this side;
+    // without this listener that surfaces as an unhandled EPIPE and fails
+    // the whole test run rather than the one assertion that cares.
+    socket.on("error", () => {});
     const key = req.headers["sec-websocket-key"];
     if (typeof key !== "string") {
       socket.destroy();
@@ -52,7 +57,11 @@ function startMockTunnelServer(
       ...(protocol ? [`Sec-WebSocket-Protocol: ${protocol}`] : []),
       "\r\n",
     ].join("\r\n");
-    setTimeout(() => socket.write(headers), options.handshakeDelayMs ?? 0);
+    if (options.handshakeDelayMs) {
+      setTimeout(() => socket.write(headers), options.handshakeDelayMs);
+    } else {
+      socket.write(headers);
+    }
 
     const send = (data: Buffer) => {
       // Unmasked server->client binary frame; small-payload framing only
@@ -304,6 +313,90 @@ describe("createTunnelBridge", () => {
           resolve(Buffer.concat(parts));
           client.end();
         }
+      });
+      client.once("error", reject);
+    });
+
+    expect(received.length).toBe(chunk.length);
+    expect(received.equals(chunk)).toBe(true);
+  }, 10_000);
+
+  it("terminates the connection instead of growing the downstream queue without bound", async () => {
+    const mock = await startMockTunnelServer((conn) => {
+      // The native WebSocket has no way to pause "message" delivery, so a
+      // sandbox sending faster than a slow local reader drains must be met
+      // with termination past the watermark, not unbounded buffering.
+      // Frames capped at 60KB (the mock server's single-frame length
+      // limit) so several are needed to cross WS_SEND_HIGH_WATERMARK.
+      const frame = Buffer.alloc(60 * 1024, "y");
+      const frameCount = Math.ceil((WS_SEND_HIGH_WATERMARK * 2) / frame.length);
+      for (let i = 0; i < frameCount; i++) conn.send(frame);
+    });
+    cleanups.push(mock.close);
+
+    const bridge = await createTunnelBridge(access(mock.url), 5432);
+    cleanups.push(bridge.close);
+
+    const totalSent = Math.ceil((WS_SEND_HIGH_WATERMARK * 2) / (60 * 1024)) * 60 * 1024;
+    const received = await new Promise<number>((resolve, reject) => {
+      const client = net.connect(bridge.localPort, bridge.localHost);
+      let total = 0;
+      client.pause();
+      // A slow-but-draining reader, not a permanently paused one: Node
+      // never emits 'close' on a paused Readable that still has buffered
+      // unread data, so a reader that never resumes at all can't be used
+      // to observe termination — it has to actually drain to see the
+      // connection end (this is what proves closeBoth() fired: the total
+      // received falls short of everything the mock server sent).
+      const resumer = setInterval(() => {
+        client.resume();
+        setTimeout(() => client.pause(), 5);
+      }, 15);
+      client.on("data", (data: Buffer) => {
+        total += data.length;
+      });
+      client.once("close", () => {
+        clearInterval(resumer);
+        resolve(total);
+      });
+      client.once("error", () => {
+        clearInterval(resumer);
+        resolve(total);
+      });
+      setTimeout(() => {
+        clearInterval(resumer);
+        reject(new Error("connection was never terminated"));
+      }, 5_000);
+    });
+
+    expect(received).toBeLessThan(totalSent);
+  }, 10_000);
+
+  it("flushes queued data before ending the socket when the tunnel closes mid-transfer", async () => {
+    const chunk = Buffer.alloc(60 * 1024, "z");
+    const mock = await startMockTunnelServer((conn) => {
+      conn.send(chunk);
+      conn.close(); // closes right after sending, before the slow client can have read it
+    });
+    cleanups.push(mock.close);
+
+    const bridge = await createTunnelBridge(access(mock.url), 5432);
+    cleanups.push(bridge.close);
+
+    const received = await new Promise<Buffer>((resolve, reject) => {
+      const client = net.connect(bridge.localPort, bridge.localHost);
+      const parts: Buffer[] = [];
+      client.pause();
+      // Slow reader: resume in short bursts so the transfer can't complete
+      // before the tunnel's close races in.
+      const resumer = setInterval(() => {
+        client.resume();
+        setTimeout(() => client.pause(), 5);
+      }, 15);
+      client.on("data", (data: Buffer) => parts.push(data));
+      client.once("end", () => {
+        clearInterval(resumer);
+        resolve(Buffer.concat(parts));
       });
       client.once("error", reject);
     });
