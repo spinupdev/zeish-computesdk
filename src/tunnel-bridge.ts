@@ -20,6 +20,26 @@ import type { ZeishTunnelAccess } from "./zeish.types";
 const TUNNEL_PATH = "/__depot/tunnel";
 const PROTO_PREFIX = "depot-tunnel.v1.";
 
+/**
+ * A bridge is an unauthenticated raw tunnel once bound: any local process
+ * (and, if bound beyond loopback, any network peer) that can reach it gets
+ * to open a connection as the tunnel token's holder, no further credential
+ * required. Reject anything but a loopback bind so that's always confined
+ * to processes on the same machine.
+ */
+function assertLoopbackHost(host: string): void {
+  if (host === "127.0.0.1" || host === "::1" || host === "localhost") return;
+  throw new Error(
+    `tunnel bridge: localHost must be a loopback address (127.0.0.1, ::1, or localhost), got ${JSON.stringify(host)} — ` +
+      "binding beyond loopback would expose an unauthenticated raw tunnel to the network.",
+  );
+}
+
+/** `host:port`, bracketing an IPv6 literal so it's valid inside a URL authority. */
+function formatAuthority(host: string, port: number): string {
+  return host.includes(":") ? `[${host}]:${port}` : `${host}:${port}`;
+}
+
 export interface TunnelBridgeOptions {
   /** Local bind host. Default 127.0.0.1 — never expose the bridge beyond loopback. */
   localHost?: string;
@@ -53,6 +73,7 @@ export async function createTunnelBridge(
   options: TunnelBridgeOptions = {},
 ): Promise<TunnelBridge> {
   const localHost = options.localHost ?? "127.0.0.1";
+  assertLoopbackHost(localHost);
   const connectTimeoutMs = options.connectTimeoutMs ?? 15_000;
   const openTunnels = new Set<{ close(): void }>();
 
@@ -80,7 +101,7 @@ export async function createTunnelBridge(
   return {
     localHost,
     localPort: address.port,
-    httpUrl: `http://${localHost}:${address.port}`,
+    httpUrl: `http://${formatAuthority(localHost, address.port)}`,
     close: async () => {
       for (const tunnel of openTunnels) tunnel.close();
       openTunnels.clear();
@@ -108,20 +129,39 @@ function pipeSocketToTunnel(
   const pending: Buffer[] = alreadyRead && alreadyRead.length > 0 ? [alreadyRead] : [];
   let ready = false;
 
+  // Without this, a fast local sender (a bulk-transfer use case like a
+  // database dump — this bridge is generic, not CDP-only) keeps queuing
+  // ws.send() calls as fast as the socket delivers "data" events, with
+  // nothing pausing the source when proxyd/the sandbox drains slower than
+  // that. The queue grows unbounded and can exhaust the process's memory.
+  const backpressure = createBackpressureController({
+    getBufferedAmount: () => ws.bufferedAmount,
+    isOpen: () => ws.readyState === WebSocket.OPEN,
+    pause: () => socket.pause(),
+    resume: () => socket.resume(),
+    isPaused: () => socket.isPaused(),
+  });
+
   socket.on("data", (chunk: Buffer) => {
-    if (ready) ws.send(chunk);
-    else pending.push(chunk);
+    if (ready) {
+      ws.send(chunk);
+      backpressure.check();
+    } else {
+      pending.push(chunk);
+    }
   });
   ws.addEventListener("open", () => {
     ready = true;
     for (const chunk of pending) ws.send(chunk);
     pending.length = 0;
+    backpressure.check();
   });
   ws.addEventListener("message", (event) => {
     socket.write(toBuffer(event.data));
   });
 
   const closeBoth = () => {
+    backpressure.dispose();
     socket.destroy();
     try {
       ws.close();
@@ -135,6 +175,53 @@ function pipeSocketToTunnel(
   ws.addEventListener("error", () => socket.destroy());
 
   return { close: closeBoth };
+}
+
+/** Pause the local source once this much is queued on the tunnel WS. */
+export const WS_SEND_HIGH_WATERMARK = 4 * 1024 * 1024;
+/** Resume once queued data drains back below this. */
+export const WS_SEND_LOW_WATERMARK = 1 * 1024 * 1024;
+/** How often to poll bufferedAmount while paused — native WebSocket has no drain event. */
+const DRAIN_POLL_MS = 20;
+
+export interface BackpressureSource {
+  getBufferedAmount(): number;
+  isOpen(): boolean;
+  pause(): void;
+  resume(): void;
+  isPaused(): boolean;
+}
+
+/**
+ * Pauses `source` once `getBufferedAmount()` crosses the high watermark and
+ * resumes it once buffered data drains back below the low watermark (or the
+ * destination closes). Two watermarks, not one, so a value oscillating
+ * right at a single threshold can't rapidly pause/resume the source.
+ */
+export function createBackpressureController(source: BackpressureSource): {
+  check(): void;
+  dispose(): void;
+} {
+  let drainTimer: ReturnType<typeof setInterval> | undefined;
+  const check = () => {
+    if (drainTimer || source.isPaused()) return;
+    if (source.getBufferedAmount() <= WS_SEND_HIGH_WATERMARK) return;
+    source.pause();
+    drainTimer = setInterval(() => {
+      if (source.getBufferedAmount() <= WS_SEND_LOW_WATERMARK || !source.isOpen()) {
+        clearInterval(drainTimer);
+        drainTimer = undefined;
+        source.resume();
+      }
+    }, DRAIN_POLL_MS);
+  };
+  return {
+    check,
+    dispose: () => {
+      if (drainTimer) clearInterval(drainTimer);
+      drainTimer = undefined;
+    },
+  };
 }
 
 /** Opens one `/__depot/tunnel` WebSocket, authorized for `port` on `access`'s sandbox. */
@@ -176,10 +263,7 @@ function toBuffer(data: string | ArrayBuffer | Blob): Buffer {
  * DevTools request heads are a handful of short standard headers. */
 const MAX_HEAD_BYTES = 64 * 1024;
 
-export interface CdpTunnelBridge extends TunnelBridge {
-  /** Same as httpUrl — Playwright's connectOverCDP accepts either scheme for its own /json/version fetch. */
-  wsUrl: string;
-}
+export type CdpTunnelBridge = TunnelBridge;
 
 /**
  * Like createTunnelBridge, but aware of Chrome's `/json`, `/json/list`, and
@@ -187,9 +271,15 @@ export interface CdpTunnelBridge extends TunnelBridge {
  * whatever Host it saw as `ws://<host>/devtools/...`, which is meaningless
  * outside the sandbox. This rewrites every `ws://`/`wss://` occurrence in
  * such a response to point back at this bridge's own local address, so
- * `chromium.connectOverCDP`'s own discovery fetch (when given httpUrl
- * instead of a specific ws(s) endpoint) resolves to a reachable URL instead
- * of Chrome's internal one.
+ * `chromium.connectOverCDP`'s own discovery fetch resolves to a reachable
+ * URL instead of Chrome's internal one.
+ *
+ * Always connect with `httpUrl`, not a bare `ws://` URL built from it:
+ * Playwright treats a literal ws(s) endpoint as already-resolved and skips
+ * discovery entirely, but this bridge's own address has no
+ * `/devtools/browser/<id>` path — only Chrome's `/json/version` response
+ * (reached by discovery) has that. `CdpTunnelBridge` deliberately doesn't
+ * expose a `wsUrl` field for this reason; there's no valid one to give.
  *
  * The actual WebSocket upgrade (`/devtools/browser/<id>` etc.) is left
  * completely untouched — passed through as opaque bytes, same as
@@ -201,6 +291,7 @@ export async function createCdpTunnelBridge(
   options: TunnelBridgeOptions = {},
 ): Promise<CdpTunnelBridge> {
   const localHost = options.localHost ?? "127.0.0.1";
+  assertLoopbackHost(localHost);
   const connectTimeoutMs = options.connectTimeoutMs ?? 15_000;
   const openTunnels = new Set<{ close(): void }>();
   const server = net.createServer();
@@ -217,7 +308,7 @@ export async function createCdpTunnelBridge(
   if (address === null || typeof address === "string") {
     throw new Error("tunnel bridge: local TCP server has no bound port");
   }
-  const localAuthority = `${localHost}:${address.port}`;
+  const localAuthority = formatAuthority(localHost, address.port);
 
   server.on("connection", (socket) => {
     const handle = classifyThenBridge(socket, access, port, connectTimeoutMs, localAuthority);
@@ -231,7 +322,6 @@ export async function createCdpTunnelBridge(
     localHost,
     localPort: address.port,
     httpUrl: `http://${localAuthority}`,
-    wsUrl: `ws://${localAuthority}`,
     close: async () => {
       for (const tunnel of openTunnels) tunnel.close();
       openTunnels.clear();

@@ -1,13 +1,16 @@
 import { createHash } from "node:crypto";
 import http from "node:http";
 import net from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  createBackpressureController,
   createCdpTunnelBridge,
   createTunnelBridge,
   forceConnectionClose,
   replaceContentLength,
   rewriteWebSocketUrls,
+  WS_SEND_HIGH_WATERMARK,
+  WS_SEND_LOW_WATERMARK,
 } from "./tunnel-bridge";
 import type { ZeishTunnelAccess } from "./zeish.types";
 
@@ -213,6 +216,124 @@ describe("createTunnelBridge", () => {
 
     expect(received.toString()).toBe("echo:hello-tunnel");
     expect(seenProtocols).toEqual(["depot-tunnel.v1.port.5432"]);
+  });
+
+  it("rejects a non-loopback localHost instead of exposing an unauthenticated tunnel", async () => {
+    await expect(
+      createTunnelBridge(access("ws://127.0.0.1:1"), 5432, { localHost: "0.0.0.0" }),
+    ).rejects.toThrow(/loopback/);
+  });
+
+  it("accepts an IPv6 loopback host and brackets it in httpUrl", async () => {
+    const mock = await startMockTunnelServer((conn) => {
+      conn.onMessage((data) => conn.send(data));
+    });
+    cleanups.push(mock.close);
+
+    const bridge = await createTunnelBridge(access(mock.url), 5432, { localHost: "::1" });
+    cleanups.push(bridge.close);
+
+    expect(bridge.localHost).toBe("::1");
+    expect(bridge.httpUrl).toBe(`http://[::1]:${bridge.localPort}`);
+  });
+
+});
+
+describe("createBackpressureController", () => {
+  function fakeSource(initialBuffered = 0) {
+    let buffered = initialBuffered;
+    let open = true;
+    let paused = false;
+    return {
+      setBuffered: (n: number) => {
+        buffered = n;
+      },
+      setOpen: (v: boolean) => {
+        open = v;
+      },
+      get paused() {
+        return paused;
+      },
+      source: {
+        getBufferedAmount: () => buffered,
+        isOpen: () => open,
+        pause: () => {
+          paused = true;
+        },
+        resume: () => {
+          paused = false;
+        },
+        isPaused: () => paused,
+      },
+    };
+  }
+
+  it("does not pause while buffered data stays at or below the high watermark", () => {
+    const fake = fakeSource();
+    const controller = createBackpressureController(fake.source);
+    fake.setBuffered(WS_SEND_HIGH_WATERMARK);
+    controller.check();
+    expect(fake.paused).toBe(false);
+    controller.dispose();
+  });
+
+  it("pauses once buffered data exceeds the high watermark", () => {
+    const fake = fakeSource();
+    const controller = createBackpressureController(fake.source);
+    fake.setBuffered(WS_SEND_HIGH_WATERMARK + 1);
+    controller.check();
+    expect(fake.paused).toBe(true);
+    controller.dispose();
+  });
+
+  it("resumes once buffered data drains at or below the low watermark", async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = fakeSource();
+      const controller = createBackpressureController(fake.source);
+      fake.setBuffered(WS_SEND_HIGH_WATERMARK + 1);
+      controller.check();
+      expect(fake.paused).toBe(true);
+
+      fake.setBuffered(WS_SEND_LOW_WATERMARK + 1);
+      await vi.advanceTimersByTimeAsync(20);
+      expect(fake.paused).toBe(true); // still above the low watermark
+
+      fake.setBuffered(WS_SEND_LOW_WATERMARK);
+      await vi.advanceTimersByTimeAsync(20);
+      expect(fake.paused).toBe(false);
+      controller.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("resumes if the destination closes while paused, even above the low watermark", async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = fakeSource();
+      const controller = createBackpressureController(fake.source);
+      fake.setBuffered(WS_SEND_HIGH_WATERMARK + 1);
+      controller.check();
+      expect(fake.paused).toBe(true);
+
+      fake.setOpen(false);
+      await vi.advanceTimersByTimeAsync(20);
+      expect(fake.paused).toBe(false);
+      controller.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not start a second poll timer while already paused", () => {
+    const fake = fakeSource();
+    const controller = createBackpressureController(fake.source);
+    fake.setBuffered(WS_SEND_HIGH_WATERMARK + 1);
+    controller.check();
+    controller.check(); // must not throw or double-schedule
+    expect(fake.paused).toBe(true);
+    controller.dispose();
   });
 });
 
