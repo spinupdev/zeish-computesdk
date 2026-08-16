@@ -190,7 +190,12 @@ export {
   SANDBOX_ATTACH_MAX_ATTEMPTS,
   SANDBOX_READY_POLL_MS,
   SANDBOX_READY_TIMEOUT_MS,
+  TUNNEL_ACCESS_TTL_AGENT,
+  TUNNEL_ACCESS_TTL_DEFAULT,
+  TUNNEL_ACCESS_TTL_MAX,
+  TUNNEL_ACCESS_TTL_MIN,
   clampPreviewTtlSeconds,
+  clampTunnelTtlSeconds,
 } from './constants';
 
 export {
@@ -203,6 +208,9 @@ export {
   withPreviewAccessToken,
 } from './preview-access';
 export type { ZeishPreviewCodeRaw } from './preview-access';
+
+export { createCdpTunnelBridge, createTunnelBridge } from './tunnel-bridge';
+export type { CdpTunnelBridge, TunnelBridge, TunnelBridgeOptions } from './tunnel-bridge';
 
 export {
   isHealthySandboxStatus,

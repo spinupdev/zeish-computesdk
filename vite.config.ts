@@ -47,6 +47,13 @@ export default defineConfig({
       include: ["src"],
       outDir: "dist",
       insertTypesEntry: true,
+      // Must stay true: per-file output (rollupTypes: false) makes
+      // insertTypesEntry's index.d.ts re-export sibling files with
+      // extension-less relative specifiers ("./zeish.types"), which
+      // "moduleResolution": "NodeNext" consumers (e.g. arin) cannot
+      // resolve at all — every named export disappears. Bundling into one
+      // file removes the internal relative imports entirely, sidestepping
+      // that entirely.
       rollupTypes: true,
       tsconfigPath: resolve(root, "tsconfig.json"),
       exclude: ["src/**/*.test.ts"],

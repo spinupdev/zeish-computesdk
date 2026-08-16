@@ -309,6 +309,40 @@ export interface ZeishTerminalUrlResponse {
   url: string | null;
 }
 
+export interface ZeishTunnelAccessResponse {
+  ws_url: string;
+  token: string;
+  expires_at: string;
+}
+
+export interface ZeishCreateTunnelAccessInput {
+  /**
+   * Tunnel access lifetime in seconds.
+   * Edge enforces 1..3600 (see TUNNEL_ACCESS_TTL_* in constants.ts).
+   * createZeishApi clamps out-of-range values; omit for default 60s.
+   * Use TUNNEL_ACCESS_TTL_AGENT (3600) for long Playwright CDP sessions.
+   */
+  ttl_seconds?: number;
+}
+
+/**
+ * Tunnel access returned by createTunnelAccess (SDK-normalized camelCase).
+ *
+ * Unlike createPreviewCode, wsUrl is never forwarded as an HTTP request
+ * carrying this hostname to the backend — proxyd's /__depot/tunnel
+ * terminates the WebSocket itself and dials the backend directly, so it
+ * works for raw TCP services that validate their own Host (Chrome CDP
+ * included). See createCdpTunnelBridge for a ready-to-use local connector.
+ */
+export interface ZeishTunnelAccess {
+  /** `wss://{machine}.tunnel.{base}/__depot/tunnel` — connect with a
+   * `depot-tunnel.v1.port.<port>` Sec-WebSocket-Protocol and `?token=`. */
+  wsUrl: string;
+  /** Short-lived JWT (tunnel:connect, audience-bound to wsUrl's host). */
+  token: string;
+  expiresAt: string;
+}
+
 export type ZeishLogSource = "boot" | "memory" | "app";
 
 export interface ZeishListLogsOptions {
@@ -381,6 +415,10 @@ export interface ZeishPublicApi {
     sandboxId: string,
     input?: ZeishCreatePreviewCodeInput,
   ): Promise<ZeishPreviewCode>;
+  createTunnelAccess(
+    sandboxId: string,
+    input?: ZeishCreateTunnelAccessInput,
+  ): Promise<ZeishTunnelAccess>;
   listLogs(
     sandboxId: string,
     options?: ZeishListLogsOptions,

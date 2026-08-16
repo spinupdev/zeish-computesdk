@@ -4,6 +4,7 @@ import type {
   ZeishCreateNetworkInput,
   ZeishCreatePreviewCodeInput,
   ZeishCreateSandboxInput,
+  ZeishCreateTunnelAccessInput,
   ZeishCreateVolumeInput,
   ZeishListEventsOptions,
   ZeishListLogsOptions,
@@ -23,10 +24,12 @@ import type {
   ZeishSnapshot,
   ZeishTemplate,
   ZeishTerminalUrlResponse,
+  ZeishTunnelAccess,
   ZeishVolume,
   ZeishPreviewCodeResponse,
+  ZeishTunnelAccessResponse,
 } from "./zeish.types";
-import { clampPreviewTtlSeconds } from "./constants";
+import { clampPreviewTtlSeconds, clampTunnelTtlSeconds } from "./constants";
 import { normalizePreviewCode } from "./preview-access";
 import { createZeishTransport } from './transport';
 
@@ -228,6 +231,24 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
         }),
       );
       return normalizePreviewCode(raw);
+    },
+    createTunnelAccess: async (sandboxId, input = {}) => {
+      // Clamp ttl_seconds to Edge contract (1..TUNNEL_ACCESS_TTL_MAX) before send.
+      const normalized: ZeishCreateTunnelAccessInput = {
+        ttl_seconds: clampTunnelTtlSeconds(input.ttl_seconds),
+      };
+      const raw = await apiRequest<ZeishTunnelAccessResponse>(
+        `${sandboxPath(sandboxId)}/tunnel-access`,
+        mutation(config, {
+          method: "POST",
+          body: JSON.stringify(normalized),
+        }),
+      );
+      return {
+        wsUrl: raw.ws_url,
+        token: raw.token,
+        expiresAt: raw.expires_at,
+      };
     },
     listLogs: (sandboxId, options: ZeishListLogsOptions = {}) =>
       apiRequest<ZeishLogEntry[]>(

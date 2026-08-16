@@ -45,3 +45,28 @@ export function clampPreviewTtlSeconds(
   if (raw > PREVIEW_CODE_TTL_MAX) return PREVIEW_CODE_TTL_MAX;
   return raw;
 }
+
+/** Same 1..3600 range as preview codes — see CreateTunnelAccessSchema in edge. */
+export const TUNNEL_ACCESS_TTL_MIN = 1;
+export const TUNNEL_ACCESS_TTL_MAX = 3600;
+
+/** Default when caller omits ttl_seconds for tunnel access (1 minute). */
+export const TUNNEL_ACCESS_TTL_DEFAULT = 60;
+
+/** Recommended TTL for Playwright CDP tunnels (must be ≤ TUNNEL_ACCESS_TTL_MAX). */
+export const TUNNEL_ACCESS_TTL_AGENT = 3600;
+
+/**
+ * Clamp ttl_seconds to Edge's tunnel-access allowed range.
+ * Undefined → TUNNEL_ACCESS_TTL_DEFAULT.
+ */
+export function clampTunnelTtlSeconds(
+  ttl: number | undefined,
+  fallback: number = TUNNEL_ACCESS_TTL_DEFAULT,
+): number {
+  const raw =
+    typeof ttl === "number" && Number.isFinite(ttl) ? Math.floor(ttl) : fallback;
+  if (raw < TUNNEL_ACCESS_TTL_MIN) return TUNNEL_ACCESS_TTL_MIN;
+  if (raw > TUNNEL_ACCESS_TTL_MAX) return TUNNEL_ACCESS_TTL_MAX;
+  return raw;
+}
