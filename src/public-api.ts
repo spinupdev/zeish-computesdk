@@ -22,6 +22,9 @@ import type {
   ZeishSandbox,
   ZeishSandboxEvent,
   ZeishSandboxPage,
+  ZeishSshKey,
+  ZeishCreateSshKeyInput,
+  ZeishUpdateSandboxInput,
   ZeishSnapshot,
   ZeishTemplate,
   ZeishTerminalUrlResponse,
@@ -32,7 +35,7 @@ import type {
 } from "./zeish.types";
 import { clampPreviewTtlSeconds, clampTunnelTtlSeconds } from "./constants";
 import { normalizePreviewCode } from "./preview-access";
-import { createZeishTransport } from './transport';
+import { createZeishTransport } from "./transport";
 
 /** Default Edge public API base (override with ZEISH_BASE_URL / config.baseUrl). */
 export const defaultBaseUrl = "https://api.dvito.cloud/api/v1";
@@ -170,16 +173,10 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
     createSandbox: ({ idempotencyKey: key, ...input }) =>
       apiRequest<ZeishSandbox>(
         "/public/sandboxes",
-        mutation(
-          config,
-          { method: "POST", body: JSON.stringify(input) },
-          key,
-        ),
+        mutation(config, { method: "POST", body: JSON.stringify(input) }, key),
       ),
     listSandboxes: (options: ZeishPageOptions = {}) =>
-      apiRequest<ZeishSandboxPage>(
-        `/public/sandboxes${queryString(options)}`,
-      ),
+      apiRequest<ZeishSandboxPage>(`/public/sandboxes${queryString(options)}`),
     async *iterateSandboxes(
       options: ZeishPageOptions = {},
     ): AsyncIterable<ZeishSandbox> {
@@ -195,8 +192,28 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
         cursor = page.nextCursor ?? undefined;
       } while (cursor);
     },
-    getSandbox: (sandboxId) =>
-      apiRequest<ZeishSandbox>(sandboxPath(sandboxId)),
+    getSandbox: (sandboxId) => apiRequest<ZeishSandbox>(sandboxPath(sandboxId)),
+    updateSandbox: (sandboxId, input: ZeishUpdateSandboxInput) =>
+      apiRequest<ZeishSandbox>(
+        sandboxPath(sandboxId),
+        mutation(config, { method: "PATCH", body: JSON.stringify(input) }),
+      ),
+    syncSandboxSshKeys: (sandboxId) =>
+      apiRequest<ZeishSandbox>(
+        `${sandboxPath(sandboxId)}/ssh-keys/sync`,
+        mutation(config, { method: "POST" }),
+      ),
+    listSshKeys: () => apiRequest<ZeishSshKey[]>("/public/ssh-keys"),
+    createSshKey: (input: ZeishCreateSshKeyInput) =>
+      apiRequest<ZeishSshKey>(
+        "/public/ssh-keys",
+        mutation(config, { method: "POST", body: JSON.stringify(input) }),
+      ),
+    deleteSshKey: (keyId: string) =>
+      apiRequest<ZeishOperationResult>(
+        `/public/ssh-keys/${encodeURIComponent(keyId)}`,
+        mutation(config, { method: "DELETE" }),
+      ),
     addPort: (sandboxId, input: ZeishAddSandboxPortInput) =>
       apiRequest<ZeishSandbox>(
         `${sandboxPath(sandboxId)}/ports`,
@@ -311,8 +328,7 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
       apiRequest<ZeishPage<ZeishNetwork>>(
         `/public/networks${queryString(options)}`,
       ),
-    getNetwork: (networkId) =>
-      apiRequest<ZeishNetwork>(networkPath(networkId)),
+    getNetwork: (networkId) => apiRequest<ZeishNetwork>(networkPath(networkId)),
     deleteNetwork: (networkId) =>
       apiRequest<ZeishNetwork>(
         networkPath(networkId),

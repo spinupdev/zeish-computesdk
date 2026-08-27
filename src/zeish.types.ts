@@ -48,12 +48,12 @@ export type ZeishSandboxStatus =
   | "destroyed";
 
 export type ZeishSandboxLifecycleAction =
-  | 'start'
-  | 'pause'
-  | 'resume'
-  | 'stop'
-  | 'kill'
-  | 'destroy';
+  | "start"
+  | "pause"
+  | "resume"
+  | "stop"
+  | "kill"
+  | "destroy";
 
 export type ZeishSandboxDriver = "firecracker" | "cloud-hypervisor";
 
@@ -70,7 +70,7 @@ export interface ZeishIngress {
 
 export interface ZeishService {
   name?: string;
-  mode?: 'raw_l4';
+  mode?: "raw_l4";
   protocol: ZeishIngressProtocol;
   internal_port: number;
   ports: Array<{ port: number; handlers?: string[] }>;
@@ -80,7 +80,7 @@ export interface ZeishService {
   transport?: ZeishIngressProtocol;
   host?: string;
   port?: number;
-  access_policy?: 'private' | 'org' | 'public';
+  access_policy?: "private" | "org" | "public";
   access_url?: string;
   access_token?: string;
   access_headers?: Record<string, string>;
@@ -112,6 +112,30 @@ export interface ZeishSandbox {
   updatedAt: string;
 }
 
+export interface ZeishSshKey {
+  id: string;
+  name: string;
+  publicKey: string;
+  isManaged: boolean;
+  createdAt: string;
+}
+
+export interface ZeishCreateSshKeyInput {
+  name: string;
+  publicKey: string;
+}
+
+export interface ZeishUpdateSandboxInput {
+  name?: string;
+  templateId?: string;
+  cpu?: number;
+  memory?: number;
+  region?: "bremen";
+  networkId?: string | null;
+  volumeIds?: string[];
+  labels?: Record<string, string>;
+}
+
 export interface ZeishManagedSandbox extends ZeishSandbox {
   config: ZeishConfig;
   access?: ZeishAccess;
@@ -136,7 +160,7 @@ export interface ZeishVolume {
 export interface ZeishCreateVolumeInput {
   name: string;
   slug?: string;
-  region: string;
+  region: "bremen";
   sizeGb: number;
 }
 
@@ -152,7 +176,7 @@ export interface ZeishNetwork {
 export interface ZeishCreateNetworkInput {
   name: string;
   slug?: string;
-  region: string;
+  region: "bremen";
 }
 
 export interface ZeishTemplate {
@@ -193,7 +217,7 @@ export interface ZeishAccess {
 export interface ZeishCreateSandboxVolumeInput {
   name: string;
   slug?: string;
-  region?: string;
+  region?: "bremen";
   sizeGb: number;
 }
 
@@ -205,7 +229,7 @@ export interface ZeishCreateSandboxOptions {
   /** Memory in MB for this sandbox; defaults to the selected template. */
   memory?: number;
   /** Zeish currently provisions only in Bremen. Omit to use Bremen. */
-  region?: 'bremen';
+  region?: "bremen";
   networkId?: string;
   volumeIds?: string[];
   createVolumes?: ZeishCreateSandboxVolumeInput[];
@@ -238,7 +262,7 @@ export interface ZeishDesktopActionResponse {
   success?: boolean;
 }
 
-export type ZeishMouseButton = 'left' | 'middle' | 'right' | 'back' | 'forward';
+export type ZeishMouseButton = "left" | "middle" | "right" | "back" | "forward";
 
 /** Wire representation consumed by sandboxd's desktop action endpoint. */
 export interface ZeishSandboxdAction {
@@ -255,11 +279,11 @@ export interface ZeishSandboxdAction {
 }
 
 export type ZeishSandboxActionType =
-  | 'move'
-  | 'click'
-  | 'type'
-  | 'key'
-  | 'scroll';
+  | "move"
+  | "click"
+  | "type"
+  | "key"
+  | "scroll";
 
 export type ZeishCreateSandboxInput = ZeishCreateSandboxOptions &
   (
@@ -414,6 +438,14 @@ export interface ZeishPublicApi {
   listSandboxes(options?: ZeishPageOptions): Promise<ZeishSandboxPage>;
   iterateSandboxes(options?: ZeishPageOptions): AsyncIterable<ZeishSandbox>;
   getSandbox(sandboxId: string): Promise<ZeishSandbox>;
+  updateSandbox(
+    sandboxId: string,
+    input: ZeishUpdateSandboxInput,
+  ): Promise<ZeishSandbox>;
+  syncSandboxSshKeys(sandboxId: string): Promise<ZeishSandbox>;
+  listSshKeys(): Promise<ZeishSshKey[]>;
+  createSshKey(input: ZeishCreateSshKeyInput): Promise<ZeishSshKey>;
+  deleteSshKey(keyId: string): Promise<ZeishOperationResult>;
   addPort(
     sandboxId: string,
     input: ZeishAddSandboxPortInput,
