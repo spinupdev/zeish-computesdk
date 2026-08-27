@@ -17,6 +17,8 @@ import type {
   ZeishManagedSandbox,
 } from './zeish.types';
 
+const ZEISH_REGION = 'bremen' as const;
+
 type ZeishProviderCreateSandboxOptions = CreateSandboxOptions &
   Pick<ZeishCreateSandboxOptions, 'ingress'>;
 
@@ -69,16 +71,21 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
   name: 'zeish',
   methods: {
     sandbox: {
-      create: async (config, options?: CreateSandboxOptions) => {
+        create: async (config, options?: CreateSandboxOptions) => {
         const ingress = (options as ZeishProviderCreateSandboxOptions | undefined)?.ingress;
         const templateId = options?.templateId ?? config.defaultTemplateId;
-        if (!templateId) {
+          if (!templateId) {
           throw new Error('Zeish requires a templateId. Pass sandbox.create({ templateId }) or set defaultTemplateId in the Zeish config.');
-        }
-        const sandbox = await createZeishApi(config).createSandbox({
+          }
+          if (options?.region && options.region !== ZEISH_REGION) {
+            throw new Error(`Zeish supports only the ${ZEISH_REGION} region.`);
+          }
+          const sandbox = await createZeishApi(config).createSandbox({
           name: options?.name ?? 'Zeish sandbox',
           templateId,
-          ...(options?.region ? { region: options.region } : {}),
+          ...(options?.cpu !== undefined ? { cpu: options.cpu } : {}),
+          ...(options?.memory !== undefined ? { memory: options.memory } : {}),
+            region: options?.region ?? ZEISH_REGION,
           ...(options?.metadata ? { metadata: options.metadata } : {}),
           ...(ingress ? { ingress } : {}),
         });
