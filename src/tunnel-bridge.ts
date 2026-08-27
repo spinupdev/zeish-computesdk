@@ -129,6 +129,7 @@ function pipeSocketToTunnel(
   const pending: Buffer[] = alreadyRead && alreadyRead.length > 0 ? [alreadyRead] : [];
   let pendingBytes = pending.reduce((n, b) => n + b.length, 0);
   let ready = false;
+  let downstreamFlushTimer: ReturnType<typeof setTimeout> | undefined;
 
   // Without this, a fast local sender (a bulk-transfer use case like a
   // database dump — this bridge is generic, not CDP-only) keeps queuing
@@ -173,6 +174,8 @@ function pipeSocketToTunnel(
 
   const closeBoth = () => {
     backpressure.dispose();
+    if (downstreamFlushTimer) clearTimeout(downstreamFlushTimer);
+    downstreamFlushTimer = undefined;
     socket.destroy();
     try {
       ws.close();
@@ -196,6 +199,7 @@ function pipeSocketToTunnel(
   const downstreamQueue: Buffer[] = [];
   let downstreamQueueBytes = 0;
   let downstreamDraining = false;
+  let downstreamFlushScheduled = false;
   // "end" once the tail has drained (a clean tunnel close — the remote
   // side is done sending, nothing more will arrive) vs "destroy" (an
   // abrupt/error close — still worth flushing whatever already arrived,
@@ -214,6 +218,7 @@ function pipeSocketToTunnel(
     else socket.end();
   };
   const flushDownstream = () => {
+    downstreamFlushScheduled = false;
     while (downstreamQueue.length > 0) {
       const chunk = downstreamQueue[0]!;
       const ok = socket.write(chunk);
@@ -230,6 +235,19 @@ function pipeSocketToTunnel(
     }
     finishIfDrained();
   };
+  const scheduleDownstreamFlush = () => {
+    if (downstreamFlushScheduled || downstreamDraining) return;
+    downstreamFlushScheduled = true;
+    // Let a burst of WebSocket messages accumulate before writing to the
+    // local socket. `socket.write()` can accept an entire burst into the OS
+    // buffer and return true even when the application is not reading; a
+    // next-turn flush makes our explicit queue the bounded buffer that
+    // determines when the connection must be terminated.
+    downstreamFlushTimer = setTimeout(() => {
+      downstreamFlushTimer = undefined;
+      flushDownstream();
+    }, DOWNSTREAM_FLUSH_DELAY_MS);
+  };
   ws.addEventListener("message", (event) => {
     const chunk = toBuffer(event.data);
     downstreamQueue.push(chunk);
@@ -238,7 +256,7 @@ function pipeSocketToTunnel(
       closeBoth();
       return;
     }
-    if (!downstreamDraining) flushDownstream();
+    scheduleDownstreamFlush();
     if (downstreamBufferedBytes() > WS_SEND_HIGH_WATERMARK) closeBoth();
   });
 
@@ -268,6 +286,8 @@ export const WS_SEND_HIGH_WATERMARK = 4 * 1024 * 1024;
 export const WS_SEND_LOW_WATERMARK = 1 * 1024 * 1024;
 /** How often to poll bufferedAmount while paused — native WebSocket has no drain event. */
 const DRAIN_POLL_MS = 20;
+/** Small batching window so a WebSocket burst is measured before flushing. */
+const DOWNSTREAM_FLUSH_DELAY_MS = 10;
 
 export interface BackpressureSource {
   getBufferedAmount(): number;
