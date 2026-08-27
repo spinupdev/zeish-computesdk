@@ -204,7 +204,8 @@ export interface ZeishCreateSandboxOptions {
   cpu?: number;
   /** Memory in MB for this sandbox; defaults to the selected template. */
   memory?: number;
-  region?: string;
+  /** Zeish currently provisions only in Bremen. Omit to use Bremen. */
+  region?: 'bremen';
   networkId?: string;
   volumeIds?: string[];
   createVolumes?: ZeishCreateSandboxVolumeInput[];
@@ -279,6 +280,12 @@ export interface ZeishCreatePreviewCodeInput {
 }
 
 export type ZeishPortAccessPolicy = "private" | "org" | "public";
+
+export interface ZeishAddSandboxPortInput {
+  internalPort: number;
+  externalPort?: number;
+  protocol?: ZeishIngressProtocol;
+}
 
 /**
  * Preview access returned by createPreviewCode (SDK-normalized camelCase).
@@ -407,6 +414,10 @@ export interface ZeishPublicApi {
   listSandboxes(options?: ZeishPageOptions): Promise<ZeishSandboxPage>;
   iterateSandboxes(options?: ZeishPageOptions): AsyncIterable<ZeishSandbox>;
   getSandbox(sandboxId: string): Promise<ZeishSandbox>;
+  addPort(
+    sandboxId: string,
+    input: ZeishAddSandboxPortInput,
+  ): Promise<ZeishSandbox>;
   sharePort(
     sandboxId: string,
     port: number,

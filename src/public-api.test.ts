@@ -127,6 +127,35 @@ describe("createZeishApi", () => {
     );
   });
 
+  it("adds a sandbox port through the public API", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ id: "sandbox-1" }), { status: 201 }),
+      );
+    const api = createZeishApi({
+      apiKey: "zeish_live_test",
+      baseUrl: "https://edge.example/api/v1",
+      fetch,
+    });
+
+    await api.addPort("sandbox-1", {
+      internalPort: 3000,
+      externalPort: 3001,
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://edge.example/api/v1/public/sandboxes/sandbox-1/ports",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          internalPort: 3000,
+          externalPort: 3001,
+        }),
+      }),
+    );
+  });
+
   it("exposes the versioned template, network, and volume resource surface", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(() =>
       Promise.resolve(
