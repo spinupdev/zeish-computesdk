@@ -4,6 +4,7 @@ import type {
 } from './sandboxd-grpc.types';
 import type {
   ZeishAccess,
+  ZeishAddSandboxPortInput,
   ZeishConfig,
   ZeishCreatePreviewCodeInput,
   ZeishCreateSandboxInput,
@@ -57,6 +58,7 @@ export interface ZeishSandboxSession {
   screenshot(): Promise<Buffer>;
   act(action: ZeishSandboxAction): Promise<void>;
   getTerminalUrl(): Promise<ZeishTerminalUrlResponse>;
+  addPort(input: ZeishAddSandboxPortInput): Promise<ZeishSandbox>;
   createPreviewCode(input?: ZeishCreatePreviewCodeInput): Promise<ZeishPreviewCode>;
   listLogs(options?: ZeishListLogsOptions): Promise<ZeishLogEntry[]>;
   listEvents(options?: ZeishListEventsOptions): Promise<ZeishSandboxEvent[]>;
