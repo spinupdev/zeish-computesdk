@@ -15,7 +15,12 @@ describe("createZeishApi", () => {
       fetch,
     });
 
-    await api.createSandbox({ name: "SDK test", template: "base" });
+    await api.createSandbox({
+      name: "SDK test",
+      template: "base",
+      cpu: 4,
+      memory: 2048,
+    });
 
     expect(fetch).toHaveBeenCalledWith(
       "https://edge.example/api/v1/public/sandboxes",
@@ -30,6 +35,10 @@ describe("createZeishApi", () => {
     expect(fetch.mock.calls[0]?.[1]?.headers).not.toHaveProperty(
       "X-External-Provider",
     );
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({
+      cpu: 4,
+      memory: 2048,
+    });
   });
 
   it("preserves the documented opaque page envelope", async () => {

@@ -200,6 +200,10 @@ export interface ZeishCreateSandboxVolumeInput {
 export interface ZeishCreateSandboxOptions {
   name: string;
   driver?: ZeishSandboxDriver;
+  /** CPU cores for this sandbox; defaults to the selected template. */
+  cpu?: number;
+  /** Memory in MB for this sandbox; defaults to the selected template. */
+  memory?: number;
   region?: string;
   networkId?: string;
   volumeIds?: string[];

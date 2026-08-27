@@ -78,6 +78,8 @@ export const zeish = defineProvider<ZeishManagedSandbox, ZeishConfig>({
         const sandbox = await createZeishApi(config).createSandbox({
           name: options?.name ?? 'Zeish sandbox',
           templateId,
+          ...(options?.cpu !== undefined ? { cpu: options.cpu } : {}),
+          ...(options?.memory !== undefined ? { memory: options.memory } : {}),
           ...(options?.region ? { region: options.region } : {}),
           ...(options?.metadata ? { metadata: options.metadata } : {}),
           ...(ingress ? { ingress } : {}),
