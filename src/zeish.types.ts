@@ -455,6 +455,11 @@ export interface ZeishPublicApi {
     port: number,
     policy: ZeishPortAccessPolicy,
   ): Promise<ZeishSandbox>;
+  sharePort(
+    sandboxId: string,
+    port: number,
+    policy: ZeishPortAccessPolicy,
+  ): Promise<ZeishSandbox>;
   destroySandbox(sandboxId: string): Promise<ZeishSandbox>;
   getExecAccess(sandboxId: string): Promise<ZeishAccess>;
   getTerminalUrl(sandboxId: string): Promise<ZeishTerminalUrlResponse>;

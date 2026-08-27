@@ -92,8 +92,14 @@ const sandbox = await createAndStartSandbox(api, {
   name: 'agent-run',
   templateId: process.env.ZEISH_TEMPLATE_ID!,
   ingress: [
-    { mode: 'raw_l4', protocol: 'tcp', internalPort: CHROME_CDP_PORT },
-  ], // 9222 for Chromium CDP
+    {
+      mode: 'raw_l4',
+      protocol: 'tcp',
+      internalPort: CHROME_CDP_PORT,
+    },
+  ], // 9222 for Chromium CDP; ingress is org-scoped by default
+  // Share selected declared ports globally after the runtime is ready.
+  publicPorts: [CHROME_CDP_PORT],
   labels: { arin: '1' },
 });
 
@@ -123,6 +129,38 @@ const version = await fetch(`${preview.baseUrl}/json/version`, {
 Runtime services expose protocol-aware endpoints. HTTP/WebSocket services have
 `url`; native UDP services have `transport: 'udp'`, `host`, and `port` instead
 of an `https://...-udp...` URL.
+
+### Public ports
+
+Public port exposure is independent of preview-code TTL. Declare it while
+creating a sandbox with `ingress`, or add it after the sandbox is running:
+
+```ts
+const sandbox = await api.createSandbox({
+  name: 'web-app',
+  templateId: process.env.ZEISH_TEMPLATE_ID!,
+  ingress: [{
+    mode: 'raw_l4',
+    protocol: 'tcp',
+    internalPort: 3000,
+  }],
+});
+
+// For an already-running sandbox:
+await api.addPort(sandbox.id, {
+  internalPort: 8080,
+  protocol: 'tcp',
+});
+// AddPort creates an organization-scoped route; make it globally public only
+// when that is intentional:
+await api.sharePort(sandbox.id, 8080, 'public');
+```
+
+The resulting service metadata is returned by Edge in the sandbox response.
+Organization-scoped service URLs include a short-lived signed handoff token,
+so they open without an interactive login while rejecting tokens from other
+organizations. A globally `public` port has no authentication by design and
+is reachable by anyone who knows its URL.
 
 ### Preview auth (Edge public API + proxyd)
 

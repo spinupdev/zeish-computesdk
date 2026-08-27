@@ -15,6 +15,7 @@ import type {
   ZeishLogEntry,
   ZeishPageOptions,
   ZeishPreviewCode,
+  ZeishPortAccessPolicy,
   ZeishSandbox,
   ZeishSandboxEvent,
   ZeishSandboxPage,
@@ -59,6 +60,7 @@ export interface ZeishSandboxSession {
   act(action: ZeishSandboxAction): Promise<void>;
   getTerminalUrl(): Promise<ZeishTerminalUrlResponse>;
   addPort(input: ZeishAddSandboxPortInput): Promise<ZeishSandbox>;
+  sharePort(port: number, policy: ZeishPortAccessPolicy): Promise<ZeishSandbox>;
   createPreviewCode(input?: ZeishCreatePreviewCodeInput): Promise<ZeishPreviewCode>;
   listLogs(options?: ZeishListLogsOptions): Promise<ZeishLogEntry[]>;
   listEvents(options?: ZeishListEventsOptions): Promise<ZeishSandboxEvent[]>;

@@ -25,6 +25,7 @@ import type {
   ZeishLogEntry,
   ZeishPageOptions,
   ZeishPreviewCode,
+  ZeishPortAccessPolicy,
   ZeishSandbox,
   ZeishSandboxEvent,
   ZeishSandboxPage,
@@ -216,6 +217,10 @@ class EdgeSandboxSession implements ZeishSandboxSession {
 
   addPort(input: ZeishAddSandboxPortInput): Promise<ZeishSandbox> {
     return createZeishApi(this.config).addPort(this.id, input);
+  }
+
+  sharePort(port: number, policy: ZeishPortAccessPolicy): Promise<ZeishSandbox> {
+    return createZeishApi(this.config).sharePort(this.id, port, policy);
   }
 
   createPreviewCode(input: ZeishCreatePreviewCodeInput = {}): Promise<ZeishPreviewCode> {
