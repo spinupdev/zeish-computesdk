@@ -15,7 +15,12 @@ describe("createZeishApi", () => {
       fetch,
     });
 
-    await api.createSandbox({ name: "SDK test", template: "base" });
+    await api.createSandbox({
+      name: "SDK test",
+      template: "base",
+      cpu: 4,
+      memory: 2048,
+    });
 
     expect(fetch).toHaveBeenCalledWith(
       "https://edge.example/api/v1/public/sandboxes",
@@ -30,6 +35,10 @@ describe("createZeishApi", () => {
     expect(fetch.mock.calls[0]?.[1]?.headers).not.toHaveProperty(
       "X-External-Provider",
     );
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({
+      cpu: 4,
+      memory: 2048,
+    });
   });
 
   it("preserves the documented opaque page envelope", async () => {
@@ -114,6 +123,35 @@ describe("createZeishApi", () => {
       expect.objectContaining({
         method: "PUT",
         body: JSON.stringify({ policy: "public" }),
+      }),
+    );
+  });
+
+  it("adds a sandbox port through the public API", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ id: "sandbox-1" }), { status: 201 }),
+      );
+    const api = createZeishApi({
+      apiKey: "zeish_live_test",
+      baseUrl: "https://edge.example/api/v1",
+      fetch,
+    });
+
+    await api.addPort("sandbox-1", {
+      internalPort: 3000,
+      externalPort: 3001,
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://edge.example/api/v1/public/sandboxes/sandbox-1/ports",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          internalPort: 3000,
+          externalPort: 3001,
+        }),
       }),
     );
   });

@@ -14,6 +14,7 @@ import type {
 } from './zeish-sandbox-client.types';
 import type {
   ZeishAccess,
+  ZeishAddSandboxPortInput,
   ZeishCreatePreviewCodeInput,
   ZeishCreateSandboxInput,
   ZeishFileEntry,
@@ -211,6 +212,10 @@ class EdgeSandboxSession implements ZeishSandboxSession {
 
   getTerminalUrl(): Promise<ZeishTerminalUrlResponse> {
     return createZeishApi(this.config).getTerminalUrl(this.id);
+  }
+
+  addPort(input: ZeishAddSandboxPortInput): Promise<ZeishSandbox> {
+    return createZeishApi(this.config).addPort(this.id, input);
   }
 
   createPreviewCode(input: ZeishCreatePreviewCodeInput = {}): Promise<ZeishPreviewCode> {

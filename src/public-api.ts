@@ -1,5 +1,6 @@
 import type {
   ZeishAccess,
+  ZeishAddSandboxPortInput,
   ZeishConfig,
   ZeishCreateNetworkInput,
   ZeishCreatePreviewCodeInput,
@@ -196,6 +197,14 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
     },
     getSandbox: (sandboxId) =>
       apiRequest<ZeishSandbox>(sandboxPath(sandboxId)),
+    addPort: (sandboxId, input: ZeishAddSandboxPortInput) =>
+      apiRequest<ZeishSandbox>(
+        `${sandboxPath(sandboxId)}/ports`,
+        mutation(config, {
+          method: "POST",
+          body: JSON.stringify(input),
+        }),
+      ),
     sharePort: (sandboxId, port, policy: ZeishPortAccessPolicy) =>
       apiRequest<ZeishSandbox>(
         `${sandboxPath(sandboxId)}/ports/${port}/share`,
