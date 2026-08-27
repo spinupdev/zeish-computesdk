@@ -60,6 +60,11 @@ await sandbox.desktop.key('ENTER');
 await sandbox.destroy();
 ```
 
+Sandboxes are provisioned in the `bremen` region. The SDK supplies that
+region when it is omitted and rejects other regions before making a request.
+The created sandbox includes the user's active Edge SSH keys, and its detail
+response exposes the SSH command once the runtime is started.
+
 `desktop` calls sandboxd's authenticated native Wayland display endpoints.
 It supports screenshots plus move, click, scroll, text, and named key actions
 through the desktop-agentd privilege boundary; X11 and Xwayland are not
