@@ -201,6 +201,13 @@ function pipeSocketToTunnel(
   // abrupt/error close — still worth flushing whatever already arrived,
   // but don't wait around for more).
   let pendingTeardown: "end" | "destroy" | null = null;
+  // `downstreamQueueBytes` only covers chunks waiting in our array. Once a
+  // chunk is handed to socket.write(), Node may retain it in the writable
+  // buffer even though it is no longer in that array. Count both buffers so
+  // a fast WebSocket sender cannot move the unbounded queue into Node's
+  // internal socket buffer and bypass the watermark.
+  const downstreamBufferedBytes = () =>
+    downstreamQueueBytes + socket.writableLength;
   const finishIfDrained = () => {
     if (!pendingTeardown || downstreamQueue.length > 0 || downstreamDraining) return;
     if (pendingTeardown === "destroy") socket.destroy();
@@ -227,11 +234,12 @@ function pipeSocketToTunnel(
     const chunk = toBuffer(event.data);
     downstreamQueue.push(chunk);
     downstreamQueueBytes += chunk.length;
-    if (downstreamQueueBytes > WS_SEND_HIGH_WATERMARK) {
+    if (downstreamBufferedBytes() > WS_SEND_HIGH_WATERMARK) {
       closeBoth();
       return;
     }
     if (!downstreamDraining) flushDownstream();
+    if (downstreamBufferedBytes() > WS_SEND_HIGH_WATERMARK) closeBoth();
   });
 
   socket.once("close", closeBoth);
