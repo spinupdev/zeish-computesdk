@@ -98,9 +98,10 @@ const sandbox = await createAndStartSandbox(api, {
       internalPort: CHROME_CDP_PORT,
     },
   ], // 9222 for Chromium CDP; ingress is org-scoped by default
+  labels: { arin: '1' },
+}, {
   // Share selected declared ports globally after the runtime is ready.
   publicPorts: [CHROME_CDP_PORT],
-  labels: { arin: '1' },
 });
 
 // ttl_seconds is clamped client-side to Edge max (1..3600)
