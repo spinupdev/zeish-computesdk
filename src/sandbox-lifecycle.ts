@@ -70,6 +70,8 @@ export interface CreateAndStartOptions {
   maxAttempts?: number;
   readyTimeoutMs?: number;
   pollIntervalMs?: number;
+  /** External ports declared in ingress that should be globally public. */
+  publicPorts?: number[];
   /** Called after each failed attempt (before destroy). */
   onAttemptFailed?: (info: {
     attempt: number;
@@ -133,10 +135,14 @@ export async function createAndStartSandbox(
         }
       }
 
-      return await waitUntilRunning(api, created.id, {
+      const running = await waitUntilRunning(api, created.id, {
         ...(options.readyTimeoutMs !== undefined ? { timeoutMs: options.readyTimeoutMs } : {}),
         ...(options.pollIntervalMs !== undefined ? { pollIntervalMs: options.pollIntervalMs } : {}),
       });
+      for (const port of options.publicPorts ?? []) {
+        await api.sharePort(created.id, port, "public");
+      }
+      return options.publicPorts?.length ? await api.getSandbox(created.id) : running;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       errors.push(`attempt ${attempt}: ${message}`);

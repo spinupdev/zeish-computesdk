@@ -93,13 +93,21 @@ describe("createZeishApi", () => {
       name: "UDP sandbox",
       template: "base",
       ingress: [
-        { mode: "raw_l4", protocol: "udp", internalPort: 27015 },
+        {
+          mode: "raw_l4",
+          protocol: "udp",
+          internalPort: 27015,
+        },
       ],
     });
 
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({
       ingress: [
-        { mode: "raw_l4", protocol: "udp", internalPort: 27015 },
+        {
+          mode: "raw_l4",
+          protocol: "udp",
+          internalPort: 27015,
+        },
       ],
     });
   });
