@@ -66,6 +66,12 @@ export interface ZeishIngress {
   protocol: ZeishIngressProtocol;
   internalPort: number;
   externalPort?: number;
+  /**
+   * Access tier for this port. Omit for the org-scoped default; set to
+   * `"public"` to expose it with no auth at create time (no follow-up
+   * `sharePort` call). See {@link ZeishPortAccessPolicy}.
+   */
+  accessPolicy?: ZeishPortAccessPolicy;
 }
 
 export interface ZeishService {
@@ -80,7 +86,7 @@ export interface ZeishService {
   transport?: ZeishIngressProtocol;
   host?: string;
   port?: number;
-  access_policy?: "private" | "org" | "public";
+  access_policy?: ZeishPortAccessPolicy;
   access_url?: string;
   access_token?: string;
   access_headers?: Record<string, string>;
@@ -303,12 +309,29 @@ export interface ZeishCreatePreviewCodeInput {
   ttl_seconds?: number;
 }
 
-export type ZeishPortAccessPolicy = "private" | "org" | "public";
+/**
+ * Access tier for an exposed port.
+ * - `"org"` (default): only a token whose `org_id` matches the sandbox's org
+ *   may open the URL. The org-scoped handoff token works; tokens from other
+ *   organizations are rejected.
+ * - `"public"`: no authentication at all - reachable by anyone with the URL.
+ *
+ * There is no cross-org `"private"` tier: proxyd treats a bare private route
+ * as reachable by any valid fleet JWT, which every org holds. A legacy
+ * `"private"` is normalized to `"org"` server-side.
+ */
+export type ZeishPortAccessPolicy = "org" | "public";
 
 export interface ZeishAddSandboxPortInput {
   internalPort: number;
   externalPort?: number;
   protocol?: ZeishIngressProtocol;
+  /**
+   * Access tier for the new port. Omit for the org-scoped default; set to
+   * `"public"` to expose it with no auth in one call (no follow-up
+   * `sharePort`). See {@link ZeishPortAccessPolicy}.
+   */
+  accessPolicy?: ZeishPortAccessPolicy;
 }
 
 /**

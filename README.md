@@ -140,28 +140,32 @@ creating a sandbox with `ingress`, or add it after the sandbox is running:
 const sandbox = await api.createSandbox({
   name: 'web-app',
   templateId: process.env.ZEISH_TEMPLATE_ID!,
-  ingress: [{
-    mode: 'raw_l4',
-    protocol: 'tcp',
-    internalPort: 3000,
-  }],
+  ingress: [
+    { mode: 'raw_l4', protocol: 'tcp', internalPort: 3000 }, // org-scoped (default)
+    { mode: 'raw_l4', protocol: 'tcp', internalPort: 8080, accessPolicy: 'public' },
+  ],
 });
 
-// For an already-running sandbox:
-await api.addPort(sandbox.id, {
-  internalPort: 8080,
-  protocol: 'tcp',
-});
-// AddPort creates an organization-scoped route; make it globally public only
-// when that is intentional:
-await api.sharePort(sandbox.id, 8080, 'public');
+// For an already-running sandbox - org-scoped by default, or public in the
+// same call:
+await api.addPort(sandbox.id, { internalPort: 8081, protocol: 'tcp' });
+await api.addPort(sandbox.id, { internalPort: 8082, protocol: 'tcp', accessPolicy: 'public' });
+
+// To change an existing port's tier:
+await api.sharePort(sandbox.id, 8081, 'public');
 ```
 
 The resulting service metadata is returned by Edge in the sandbox response.
-Organization-scoped service URLs include a short-lived signed handoff token,
-so they open without an interactive login while rejecting tokens from other
-organizations. A globally `public` port has no authentication by design and
-is reachable by anyone who knows its URL.
+There are exactly two access tiers, set per port via `ingress[].accessPolicy`,
+`addPort`, or `sharePort`:
+
+- **`org`** (the default): the service URL carries a short-lived signed
+  handoff token, opens without an interactive login, and **rejects tokens
+  from other organizations**. There is no separate cross-org "private" tier -
+  a bare private route in proxyd is reachable by any valid fleet JWT, so a
+  legacy `'private'` is normalized to `'org'`.
+- **`public`**: no authentication at all - reachable by anyone who knows the
+  URL.
 
 ### Preview auth (Edge public API + proxyd)
 
