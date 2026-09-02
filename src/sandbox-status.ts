@@ -1,5 +1,5 @@
 /**
- * Sandbox status helpers aligned with Edge ProductState + observed live values.
+ * Sandbox status helpers aligned with the control plane's ProductState + observed live values.
  */
 
 import type {
@@ -7,7 +7,7 @@ import type {
   ZeishSandboxStatus,
 } from "./zeish.types";
 
-/** Align with Edge ProductState (+ a few legacy aliases). */
+/** Align with the control plane's ProductState (+ a few legacy aliases). */
 const TERMINAL_BAD = new Set([
   "failed",
   "error",
@@ -77,7 +77,7 @@ export function isHealthySandboxStatus(
   return isRunningSandboxStatus(status);
 }
 
-/** Returns whether Edge should accept a requested lifecycle transition. */
+/** Returns whether the control plane should accept a requested lifecycle transition. */
 export function canTransitionSandbox(
   status: ZeishSandboxStatus | string,
   action: ZeishSandboxLifecycleAction,

@@ -1,7 +1,7 @@
 /**
- * Preview URL auth helpers (proxyd / Edge public PreviewCode contract).
+ * Preview URL auth helpers (proxyd / the control plane's public PreviewCode contract).
  *
- * Edge `POST …/preview-codes` returns (v1 additive fields):
+ * The control plane's `POST …/preview-codes` returns (v1 additive fields):
  *   url / handoff_url — browser cookie handoff at /_depot/auth?code=…
  *   base_url          — clean origin for agents (Bearer / ?token=)
  *   code, expires_at
@@ -9,20 +9,20 @@
  * Server-side clients must use base_url + Bearer, never treat handoff `url`
  * as an HTTP base (that yields HTTP 401 under Node fetch / Playwright).
  *
- * Credential matrix (depot proxyd):
+ * Credential matrix (control-plane proxyd):
  *   - Authorization: Bearer <jwt>  → SDKs / server-to-server HTTP
  *   - ?token=<jwt> on WS upgrade   → clients that cannot set headers
  *   - GET /_depot/auth?code=       → browser cookie handoff only
  */
 
-/** Wire envelope from Edge POST /preview-codes (snake_case public API). */
+/** Wire envelope from the control plane's POST /preview-codes (snake_case public API). */
 export interface ZeishPreviewCodeRaw {
   url: string;
   code: string;
   expires_at: string;
-  /** Edge public field (preferred over deriving from handoff url). */
+  /** Control-plane public field (preferred over deriving from handoff url). */
   base_url?: string;
-  /** Edge public field; alias of url. */
+  /** Control-plane public field; alias of url. */
   handoff_url?: string;
   /** Legacy / already-normalized camelCase. */
   baseUrl?: string;
@@ -33,7 +33,7 @@ export interface ZeishPreviewCodeRaw {
  * Normalized preview access for both browsers and agents (camelCase SDK).
  *
  * - `url` / `handoffUrl` — open in a browser (cookie handoff)
- * - `baseUrl` — clean origin for programmatic HTTP/WS (from Edge `base_url`)
+ * - `baseUrl` — clean origin for programmatic HTTP/WS (from the control plane's `base_url`)
  * - `code` / `token` — JWT for Bearer / ?token=
  * - `headers` — ready-to-use Authorization for fetch / Playwright
  */
@@ -55,7 +55,7 @@ export interface ZeishPreviewCode {
 }
 
 /**
- * Extract clean preview origin from an Edge handoff URL (or any absolute URL).
+ * Extract clean preview origin from a control-plane handoff URL (or any absolute URL).
  */
 export function previewOriginFromHandoffUrl(handoffUrl: string): string {
   let parsed: URL;
@@ -89,9 +89,9 @@ export function withPreviewAccessToken(url: string, token: string): string {
 }
 
 /**
- * Map Edge's public PreviewCode (snake_case) to the SDK shape.
- * Prefers Edge `base_url` / `handoff_url`; falls back to parsing `url` for
- * older Edge deployments that only return url + code + expires_at.
+ * Map the control plane's public PreviewCode (snake_case) to the SDK shape.
+ * Prefers the control plane's `base_url` / `handoff_url`; falls back to parsing `url` for
+ * older control-plane deployments that only return url + code + expires_at.
  */
 export function normalizePreviewCode(
   raw: ZeishPreviewCodeRaw | ZeishPreviewCode,
@@ -101,12 +101,12 @@ export function normalizePreviewCode(
       "Zeish preview-code response missing url or code",
     );
   }
-  const fromEdgeBase =
+  const fromControlPlaneBase =
     ("base_url" in raw && typeof raw.base_url === "string" && raw.base_url) ||
     ("baseUrl" in raw && typeof raw.baseUrl === "string" && raw.baseUrl) ||
     "";
-  const baseUrl = fromEdgeBase || previewOriginFromHandoffUrl(raw.url);
-  const fromEdgeHandoff =
+  const baseUrl = fromControlPlaneBase || previewOriginFromHandoffUrl(raw.url);
+  const fromControlPlaneHandoff =
     ("handoff_url" in raw &&
       typeof raw.handoff_url === "string" &&
       raw.handoff_url) ||
@@ -119,7 +119,7 @@ export function normalizePreviewCode(
     url: raw.url,
     code: raw.code,
     expires_at: raw.expires_at,
-    handoffUrl: fromEdgeHandoff,
+    handoffUrl: fromControlPlaneHandoff,
     baseUrl,
     token,
     headers: previewAuthHeaders(token),

@@ -10,7 +10,7 @@ describe("createZeishApi", () => {
       );
     const api = createZeishApi({
       apiKey: "zeish_live_test",
-      baseUrl: "https://edge.example/api/v1",
+      baseUrl: "https://cloud.example/api/v1",
       createIdempotencyKey: () => "request-1",
       fetch,
     });
@@ -23,7 +23,7 @@ describe("createZeishApi", () => {
     });
 
     expect(fetch).toHaveBeenCalledWith(
-      "https://edge.example/api/v1/public/sandboxes",
+      "https://cloud.example/api/v1/public/sandboxes",
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
@@ -120,14 +120,14 @@ describe("createZeishApi", () => {
       );
     const api = createZeishApi({
       apiKey: "zeish_live_test",
-      baseUrl: "https://edge.example/api/v1",
+      baseUrl: "https://cloud.example/api/v1",
       fetch,
     });
 
     await api.sharePort("sandbox-1", 8080, "public");
 
     expect(fetch).toHaveBeenCalledWith(
-      "https://edge.example/api/v1/public/sandboxes/sandbox-1/ports/8080/share",
+      "https://cloud.example/api/v1/public/sandboxes/sandbox-1/ports/8080/share",
       expect.objectContaining({
         method: "PUT",
         body: JSON.stringify({ policy: "public" }),
@@ -143,7 +143,7 @@ describe("createZeishApi", () => {
       );
     const api = createZeishApi({
       apiKey: "zeish_live_test",
-      baseUrl: "https://edge.example/api/v1",
+      baseUrl: "https://cloud.example/api/v1",
       fetch,
     });
 
@@ -153,7 +153,7 @@ describe("createZeishApi", () => {
     });
 
     expect(fetch).toHaveBeenCalledWith(
-      "https://edge.example/api/v1/public/sandboxes/sandbox-1/ports",
+      "https://cloud.example/api/v1/public/sandboxes/sandbox-1/ports",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
@@ -225,7 +225,7 @@ describe("createZeishApi", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("clamps createPreviewCode ttl_seconds to Edge max", async () => {
+  it("clamps createPreviewCode ttl_seconds to control-plane max", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -248,7 +248,7 @@ describe("createZeishApi", () => {
     expect(body).toMatchObject({ port: 9222, ttl_seconds: 3600 });
   });
 
-  it("maps Edge base_url / handoff_url into agent-safe baseUrl + headers", async () => {
+  it("maps control-plane base_url / handoff_url into agent-safe baseUrl + headers", async () => {
     const handoff =
       "https://abc-9222-tcp.example.zei.sh/_depot/auth?code=jwt-token&return=%2F";
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(

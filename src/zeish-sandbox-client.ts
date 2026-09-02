@@ -39,7 +39,7 @@ const defaultAccessTimeoutMs = 5 * 60_000;
 const defaultPollIntervalMs = 2_000;
 
 /**
- * Creates a first-party Edge sandbox client. The client uses the public
+ * Creates a first-party sandbox client. The client uses the public
  * control-plane API and receives short-lived data-plane credentials per
  * sandbox; callers never need to manage a second provider protocol.
  */

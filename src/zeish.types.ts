@@ -7,7 +7,7 @@ export interface ZeishConfig {
   createIdempotencyKey?: () => string;
 }
 
-/** Strategy boundary for the Edge HTTP transport. */
+/** Strategy boundary for the control-plane HTTP transport. */
 export interface ZeishTransport {
   request(path: string, init?: RequestInit): Promise<Response>;
 }
@@ -246,7 +246,7 @@ export interface ZeishCreateSandboxOptions {
   /**
    * Sent as the request's Idempotency-Key header. Without this, request()
    * mints a fresh random UUID per call (see idempotencyKey() in
-   * public-api.ts), which defeats Edge's server-side idempotency store:
+   * public-api.ts), which defeats the control plane's server-side idempotency store:
    * every retry — including a full re-attach after a crash — looks like a
    * brand-new request and creates a duplicate sandbox. Pass a value that's
    * stable across retries of the *same* logical create (e.g. a run id, or
@@ -302,7 +302,7 @@ export interface ZeishCreatePreviewCodeInput {
   path?: string;
   /**
    * Preview code lifetime in seconds.
-   * Edge enforces 1..3600 (see PREVIEW_CODE_TTL_* in constants.ts).
+   * The control plane enforces 1..3600 (see PREVIEW_CODE_TTL_* in constants.ts).
    * createZeishApi clamps out-of-range values; omit for default 300.
    * Use PREVIEW_CODE_TTL_AGENT (3600) for long Playwright CDP sessions.
    */
@@ -337,7 +337,7 @@ export interface ZeishAddSandboxPortInput {
 /**
  * Preview access returned by createPreviewCode (SDK-normalized camelCase).
  *
- * Edge public contract (snake_case): url, handoff_url, base_url, code, expires_at.
+ * Control-plane public contract (snake_case): url, handoff_url, base_url, code, expires_at.
  * Always use `baseUrl` + `headers` (or `token`) for server-to-server / CDP —
  * never treat handoff `url` as an HTTP base.
  */
@@ -350,10 +350,10 @@ export interface ZeishPreviewCode {
   /** JWT (machines:read, aud-bound). Prefer via `headers` or `?token=`. */
   code: string;
   expires_at: string;
-  /** Explicit alias of `url` (from Edge `handoff_url`). */
+  /** Explicit alias of `url` (from the control plane's `handoff_url`). */
   handoffUrl: string;
   /**
-   * Clean preview origin from Edge `base_url`
+   * Clean preview origin from the control plane's `base_url`
    * (`https://{machine}-{port}-tcp.{base}`).
    */
   baseUrl: string;
@@ -376,7 +376,7 @@ export interface ZeishTunnelAccessResponse {
 export interface ZeishCreateTunnelAccessInput {
   /**
    * Tunnel access lifetime in seconds.
-   * Edge enforces 1..3600 (see TUNNEL_ACCESS_TTL_* in constants.ts).
+   * The control plane enforces 1..3600 (see TUNNEL_ACCESS_TTL_* in constants.ts).
    * createZeishApi clamps out-of-range values; omit for default 60s.
    * Use TUNNEL_ACCESS_TTL_AGENT (3600) for long Playwright CDP sessions.
    */
@@ -394,7 +394,7 @@ export interface ZeishCreateTunnelAccessInput {
  */
 export interface ZeishTunnelAccess {
   /** `wss://{machine}.tunnel.{base}/__depot/tunnel` — connect with a
-   * `depot-tunnel.v1.port.<port>` Sec-WebSocket-Protocol and `?token=`. */
+   * `zeish-tunnel.v1.port.<port>` Sec-WebSocket-Protocol and `?token=`. */
   wsUrl: string;
   /** Short-lived JWT (tunnel:connect, audience-bound to wsUrl's host). */
   token: string;

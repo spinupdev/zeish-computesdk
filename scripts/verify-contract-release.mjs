@@ -3,11 +3,11 @@ import { join } from "node:path";
 
 const target = process.argv.find(argument => argument === "rest" || argument === "sandboxd");
 const roots = {
-  rest: "contracts/edge-public",
+  rest: "contracts/zeish-public",
   sandboxd: "contracts/sandboxd",
 };
 const prefixes = {
-  rest: "edge-public-v",
+  rest: "zeish-public-v",
   sandboxd: "sandboxd-v",
 };
 
@@ -18,9 +18,9 @@ if (!(target in roots)) {
 const releasePath = join(roots[target], "release.json");
 const release = JSON.parse(await readFile(releasePath, "utf8"));
 
-if (release.sourceRepository !== "spinupdev/edge") {
+if (release.sourceRepository !== "zeishdev/cloud") {
   throw new Error(
-    `${releasePath} does not identify spinupdev/edge as its source.`,
+    `${releasePath} does not identify zeishdev/cloud as its source.`,
   );
 }
 if (

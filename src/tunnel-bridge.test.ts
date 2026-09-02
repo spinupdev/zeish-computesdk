@@ -225,7 +225,7 @@ describe("createTunnelBridge", () => {
     });
 
     expect(received.toString()).toBe("echo:hello-tunnel");
-    expect(seenProtocols).toEqual(["depot-tunnel.v1.port.5432"]);
+    expect(seenProtocols).toEqual(["zeish-tunnel.v1.port.5432"]);
   });
 
   it("rejects a non-loopback localHost instead of exposing an unauthenticated tunnel", async () => {

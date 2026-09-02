@@ -1,11 +1,12 @@
 # Contract inputs and generated SDKs
 
-This repository consumes immutable contract snapshots copied from Edge by the
-private repository's release sync workflow. Do not modify files under
-`contracts/` in this repository. Each copied contract subtree has a
-`release.json` file recording the source Edge tag and commit.
+This repository consumes immutable contract snapshots copied from the
+control plane by the private repository's release sync workflow. Do not
+modify files under `contracts/` in this repository. Each copied contract
+subtree has a `release.json` file recording the source control-plane tag
+and commit.
 
-`contracts/edge-public/v1/openapi.json` is the REST control-plane source. The
+`contracts/zeish-public/v1/openapi.json` is the REST control-plane source. The
 CI workflow generates TypeScript, Python, and Go clients from it. The existing
 ComputeSDK provider is the handwritten TypeScript façade over that generated
 surface and sandboxd's generated RPC bindings.
@@ -23,5 +24,5 @@ manual public release can publish the TypeScript and Python packages only after
 those same gates succeed; it requires `NPM_TOKEN` and `PYPI_TOKEN` respectively.
 The Go artifact is a versioned source archive until a dedicated Go module
 repository or a committed `go/` module is selected. A contract change is not
-released until the public API compatibility gate in Edge has passed and its
-relevant generation and package tests have passed.
+released until the public API compatibility gate in the control plane has
+passed and its relevant generation and package tests have passed.

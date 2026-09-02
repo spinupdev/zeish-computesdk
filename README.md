@@ -16,7 +16,7 @@ The optional `externalIdentity` setting only supports legacy Arin-bound keys.
 
 This is an early provider release. `runCommand()` streams sandboxd stdout and
 stderr callbacks through `ExecStream`; the deployed data plane must include
-Depot's matching gRPC route before it can be used in production.
+the control plane's matching gRPC route before it can be used in production.
 
 ComputeSDK's provider interface has no sandbox-scoped snapshot-list/delete
 operation, while Zeish intentionally keeps those snapshot endpoints
@@ -26,7 +26,7 @@ provider; use Zeish REST for them.
 ## First-party sandbox client
 
 `createZeishSandboxClient()` is the provider-neutral integration interface for
-agents such as Arin. It keeps Edge's control plane and sandboxd data plane
+agents such as Arin. It keeps the control plane and sandboxd data plane
 together: create a sandbox, wait for scoped access, then use commands, files,
 lifecycle operations, logs, events, previews, sandbox-scoped snapshots, and
 guest display actions from one session object.
@@ -34,12 +34,12 @@ guest display actions from one session object.
 ```ts
 import { createZeishSandboxClient } from '@zeish/computesdk-provider';
 
-const edge = createZeishSandboxClient({
+const sandboxClient = createZeishSandboxClient({
   apiKey: process.env.ZEISH_API_KEY!,
   defaultTemplateId: process.env.ARIN_SANDBOX_TEMPLATE!,
 });
 
-const sandbox = await edge.create({
+const sandbox = await sandboxClient.create({
   name: `arin-run-${runId}`,
   templateId: process.env.ARIN_SANDBOX_TEMPLATE!,
   metadata: { arinRunId: runId, arinAgentId: agentId },
@@ -62,7 +62,7 @@ await sandbox.destroy();
 
 Sandboxes are provisioned in the `bremen` region. The SDK supplies that
 region when it is omitted and rejects other regions before making a request.
-The created sandbox includes the user's active Edge SSH keys, and its detail
+The created sandbox includes the user's active SSH keys, and its detail
 response exposes the SSH command once the runtime is started.
 
 `desktop` calls sandboxd's authenticated native Wayland display endpoints.
@@ -72,7 +72,7 @@ required.
 
 ## Agent / CDP contracts (prevents common 400s)
 
-Helpers encode Edge rules so clients do not rediscover them:
+Helpers encode control-plane rules so clients do not rediscover them:
 
 ```ts
 import {
@@ -104,13 +104,13 @@ const sandbox = await createAndStartSandbox(api, {
   publicPorts: [CHROME_CDP_PORT],
 });
 
-// ttl_seconds is clamped client-side to Edge max (1..3600)
+// ttl_seconds is clamped client-side to the control plane's max (1..3600)
 const preview = await api.createPreviewCode(sandbox.id, {
   port: CHROME_CDP_PORT,
   ttl_seconds: PREVIEW_CODE_TTL_AGENT,
 });
 
-// Edge returns base_url + handoff_url; SDK exposes baseUrl + headers.
+// The control plane returns base_url + handoff_url; SDK exposes baseUrl + headers.
 // Agents / Playwright: never use preview.url as an HTTP base.
 const version = await fetch(`${preview.baseUrl}/json/version`, {
   headers: preview.headers,
@@ -125,7 +125,7 @@ const version = await fetch(`${preview.baseUrl}/json/version`, {
 | Terminal includes **`failed`** | `isTerminalSandboxStatus` |
 | Flaky create | `createAndStartSandbox` (destroy + retry) |
 | Generic ingress | `ingress: [{ mode: 'raw_l4', protocol: 'tcp', internalPort: CHROME_CDP_PORT }]` |
-| Preview auth | Edge `base_url` + `code` → SDK `baseUrl` + `headers` |
+| Preview auth | Control plane `base_url` + `code` → SDK `baseUrl` + `headers` |
 
 Runtime services expose protocol-aware endpoints. HTTP/WebSocket services have
 `url`; native UDP services have `transport: 'udp'`, `host`, and `port` instead
@@ -155,7 +155,7 @@ await api.addPort(sandbox.id, { internalPort: 8082, protocol: 'tcp', accessPolic
 await api.sharePort(sandbox.id, 8081, 'public');
 ```
 
-The resulting service metadata is returned by Edge in the sandbox response.
+The resulting service metadata is returned by the control plane in the sandbox response.
 There are exactly two access tiers, set per port via `ingress[].accessPolicy`,
 `addPort`, or `sharePort`:
 
@@ -167,19 +167,19 @@ There are exactly two access tiers, set per port via `ingress[].accessPolicy`,
 - **`public`**: no authentication at all - reachable by anyone who knows the
   URL.
 
-### Preview auth (Edge public API + proxyd)
+### Preview auth (control-plane public API + proxyd)
 
-Contract source of truth: Edge `PreviewCode` (`base_url`, `handoff_url`, `code`).
+Contract source of truth: the control plane's `PreviewCode` (`base_url`, `handoff_url`, `code`).
 
 | Field / helper | Use |
 |---|---|
 | `preview.url` / `handoffUrl` | Open in a **browser** (single-use cookie handoff) |
-| `preview.baseUrl` | From Edge `base_url` — `/json/version` and other HTTP paths |
+| `preview.baseUrl` | From the control plane's `base_url` — `/json/version` and other HTTP paths |
 | `preview.headers` / `token` | `Authorization: Bearer` (HTTP) or `?token=` (WebSocket) |
 | `fetchPreviewJsonVersion(preview)` | Authenticated GET of Chrome `/json/version` |
 | `resolveCdpEndpoint({ preview, webSocketDebuggerUrl })` | Ready `wsUrl` + `headers` for Playwright |
 
-`ZeishApiError` exposes `code`, `details`, and `isValidationError` for structured Edge envelopes.
+`ZeishApiError` exposes `code`, `details`, and `isValidationError` for structured control-plane envelopes.
 
 ## License
 

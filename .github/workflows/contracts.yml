@@ -44,7 +44,7 @@ jobs:
           pnpm test
 
   rest:
-    if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
+    if: ${{ hashFiles('contracts/zeish-public/v1/openapi.json') != '' }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     env:
@@ -64,18 +64,18 @@ jobs:
           pnpm test:contract-release -- rest
           rm -rf generated
           docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
-            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -i /workspace/contracts/zeish-public/v1/openapi.json \
             -g typescript-fetch -o /workspace/generated/typescript \
-            -p npmName=@zeish/edge,npmVersion=0.0.0
+            -p npmName=@zeish/computesdk,npmVersion=0.0.0
           docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
-            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -i /workspace/contracts/zeish-public/v1/openapi.json \
             -g python -o /workspace/generated/python \
-            -p packageName=zeish_edge,packageVersion=0.0.0
+            -p packageName=zeish_computesdk,packageVersion=0.0.0
           docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
-            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -i /workspace/contracts/zeish-public/v1/openapi.json \
             -g go -o /workspace/generated/go \
             --git-user-id spinupdev --git-repo-id zeish-computesdk-go \
-            -p packageName=edge
+            -p packageName=computesdk
           npm --prefix generated/typescript install --ignore-scripts
           npm --prefix generated/typescript run build
           docker run --rm -v "$PWD/generated/python:/workspace" -w /workspace python:3.12-slim \

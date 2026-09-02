@@ -15,7 +15,7 @@ const sandbox = {
 };
 
 describe('createZeishSandboxClient', () => {
-  it('uses Edge control-plane and scoped data-plane credentials for an agent run', async () => {
+  it('uses the control plane and scoped data-plane credentials for an agent run', async () => {
     const actions: Record<string, unknown>[] = [];
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation((url, init) => {
       const requestUrl = String(url);
@@ -62,7 +62,7 @@ describe('createZeishSandboxClient', () => {
     });
     const client = createZeishSandboxClient({
       apiKey: 'zeish_live_test',
-      baseUrl: 'https://edge.example/api/v1',
+      baseUrl: 'https://cloud.example/api/v1',
       createIdempotencyKey: () => 'request-1',
       fetch,
     });

@@ -4,7 +4,7 @@ const defaultBaseUrl = 'https://api.dvito.cloud/api/v1';
 const defaultRetryAttempts = 3;
 const defaultRetryDelayMs = 100;
 
-/** Default Fetch-based transport strategy for the Edge public API. */
+/** Default Fetch-based transport strategy for the control-plane public API. */
 export class FetchZeishTransport implements ZeishTransport {
   constructor(private readonly config: ZeishConfig) {}
 
@@ -28,7 +28,7 @@ export class FetchZeishTransport implements ZeishTransport {
   }
 }
 
-/** Decorator that retries idempotent reads on transient Edge failures. */
+/** Decorator that retries idempotent reads on transient control-plane failures. */
 export function withTransientRetry(
   transport: ZeishTransport,
   attempts = defaultRetryAttempts,

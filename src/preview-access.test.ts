@@ -27,7 +27,7 @@ describe("previewOriginFromHandoffUrl", () => {
 });
 
 describe("normalizePreviewCode", () => {
-  it("maps Edge base_url / handoff_url (preferred)", () => {
+  it("maps control-plane base_url / handoff_url (preferred)", () => {
     const out = normalizePreviewCode({
       url: HANDOFF,
       handoff_url: HANDOFF,
@@ -46,7 +46,7 @@ describe("normalizePreviewCode", () => {
     });
   });
 
-  it("falls back to parsing handoff url for older Edge responses", () => {
+  it("falls back to parsing handoff url for older control-plane responses", () => {
     const out = normalizePreviewCode({
       url: HANDOFF,
       code: "jwt-here",

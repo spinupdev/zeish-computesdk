@@ -88,25 +88,25 @@ jobs:
           # Skip lifecycle scripts here: validation already ran above.
           npm pack --pack-destination release-artifacts/provider --ignore-scripts
       - name: Generate and validate REST language packages
-        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
+        if: ${{ hashFiles('contracts/zeish-public/v1/openapi.json') != '' }}
         env:
           SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
         run: |
           pnpm test:contract-release -- rest
           rm -rf generated
           docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
-            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -i /workspace/contracts/zeish-public/v1/openapi.json \
             -g typescript-fetch -o /workspace/generated/typescript \
-            -p "npmName=@zeish/edge,npmVersion=${SDK_VERSION}"
+            -p "npmName=@zeish/computesdk,npmVersion=${SDK_VERSION}"
           docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
-            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -i /workspace/contracts/zeish-public/v1/openapi.json \
             -g python -o /workspace/generated/python \
-            -p "packageName=zeish_edge,packageVersion=${SDK_VERSION}"
+            -p "packageName=zeish_computesdk,packageVersion=${SDK_VERSION}"
           docker run --rm -v "$PWD:/workspace" "$OPENAPI_GENERATOR_IMAGE" generate \
-            -i /workspace/contracts/edge-public/v1/openapi.json \
+            -i /workspace/contracts/zeish-public/v1/openapi.json \
             -g go -o /workspace/generated/go \
             --git-user-id spinupdev --git-repo-id zeish-computesdk-go \
-            -p packageName=edge
+            -p packageName=computesdk
           npm --prefix generated/typescript install --ignore-scripts
           npm --prefix generated/typescript run build
           docker run --rm -v "$PWD/generated/python:/workspace" -w /workspace python:3.12-slim \
@@ -118,7 +118,7 @@ jobs:
           npm --prefix generated/typescript pack --pack-destination "$PWD/release-artifacts/rest/typescript" --ignore-scripts
           docker run --rm -v "$PWD:/workspace" -w /workspace/generated/python python:3.12-slim \
             sh -ec 'pip install --no-cache-dir build >/dev/null && python -m build --outdir /workspace/release-artifacts/rest/python'
-          tar -C generated/go -czf "release-artifacts/rest/go/zeish-edge-go-${SDK_VERSION}.tar.gz" .
+          tar -C generated/go -czf "release-artifacts/rest/go/zeish-computesdk-go-${SDK_VERSION}.tar.gz" .
           cp generated/typescript/README.md release-artifacts/rest/docs/typescript.md
           cp generated/python/README.md release-artifacts/rest/docs/python.md
           cp generated/go/README.md release-artifacts/rest/docs/go.md
@@ -128,7 +128,7 @@ jobs:
           path: release-artifacts/provider/*.tgz
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
-        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' }}
+        if: ${{ hashFiles('contracts/zeish-public/v1/openapi.json') != '' }}
         with:
           name: zeish-rest-sdks
           path: release-artifacts/rest
@@ -137,10 +137,10 @@ jobs:
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_npm)
         run: npm publish release-artifacts/provider/*.tgz --access public
       - name: Publish generated REST TypeScript client to npm (OIDC trusted publishing)
-        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_npm)) }}
+        if: ${{ hashFiles('contracts/zeish-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_npm)) }}
         run: npm publish release-artifacts/rest/typescript/*.tgz --access public
       - name: Publish generated REST Python client to PyPI
-        if: ${{ hashFiles('contracts/edge-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_pypi)) }}
+        if: ${{ hashFiles('contracts/zeish-public/v1/openapi.json') != '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_rest_pypi)) }}
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
