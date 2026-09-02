@@ -1,6 +1,6 @@
 /**
- * Edge public API contracts that consumers must respect.
- * Keep in sync with edge/contracts/edge-public/v1/openapi.json and
+ * Control-plane public API contracts that consumers must respect.
+ * Keep in sync with cloud/contracts/zeish-public/v1/openapi.json and
  * sandboxes.service createPreviewCode validation.
  */
 
@@ -9,7 +9,7 @@ export const PREVIEW_CODE_TTL_MIN = 1;
 
 /**
  * Maximum preview-code TTL (seconds).
- * Edge previously enforced 300; raised to 3600 for agent/CDP sessions.
+ * The control plane previously enforced 300; raised to 3600 for agent/CDP sessions.
  */
 export const PREVIEW_CODE_TTL_MAX = 3600;
 
@@ -32,7 +32,7 @@ export const SANDBOX_READY_POLL_MS = 2_000;
 export const SANDBOX_ATTACH_MAX_ATTEMPTS = 3;
 
 /**
- * Clamp ttl_seconds to Edge's allowed range.
+ * Clamp ttl_seconds to the control plane's allowed range.
  * Undefined → PREVIEW_CODE_TTL_DEFAULT.
  */
 export function clampPreviewTtlSeconds(
@@ -46,7 +46,7 @@ export function clampPreviewTtlSeconds(
   return raw;
 }
 
-/** Same 1..3600 range as preview codes — see CreateTunnelAccessSchema in edge. */
+/** Same 1..3600 range as preview codes — see CreateTunnelAccessSchema in the control plane. */
 export const TUNNEL_ACCESS_TTL_MIN = 1;
 export const TUNNEL_ACCESS_TTL_MAX = 3600;
 
@@ -57,7 +57,7 @@ export const TUNNEL_ACCESS_TTL_DEFAULT = 60;
 export const TUNNEL_ACCESS_TTL_AGENT = 3600;
 
 /**
- * Clamp ttl_seconds to Edge's tunnel-access allowed range.
+ * Clamp ttl_seconds to the control plane's tunnel-access allowed range.
  * Undefined → TUNNEL_ACCESS_TTL_DEFAULT.
  */
 export function clampTunnelTtlSeconds(

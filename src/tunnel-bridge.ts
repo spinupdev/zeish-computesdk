@@ -18,7 +18,7 @@ import net from "node:net";
 import type { ZeishTunnelAccess } from "./zeish.types";
 
 const TUNNEL_PATH = "/__depot/tunnel";
-const PROTO_PREFIX = "depot-tunnel.v1.";
+const PROTO_PREFIX = "zeish-tunnel.v1.";
 
 /**
  * A bridge is an unauthenticated raw tunnel once bound: any local process

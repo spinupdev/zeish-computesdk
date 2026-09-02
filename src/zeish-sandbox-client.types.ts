@@ -39,7 +39,7 @@ export interface ZeishSandboxClient {
   list(options?: ZeishPageOptions): Promise<ZeishSandboxPage>;
 }
 
-/** A session owns one Edge sandbox and exposes its control- and data-plane actions. */
+/** A session owns one sandbox and exposes its control- and data-plane actions. */
 export interface ZeishSandboxSession {
   readonly id: string;
   readonly files: ZeishSandboxFiles;

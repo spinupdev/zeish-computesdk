@@ -37,7 +37,7 @@ import { clampPreviewTtlSeconds, clampTunnelTtlSeconds } from "./constants";
 import { normalizePreviewCode } from "./preview-access";
 import { createZeishTransport } from "./transport";
 
-/** Default Edge public API base (override with ZEISH_BASE_URL / config.baseUrl). */
+/** Default control-plane public API base (override with ZEISH_BASE_URL / config.baseUrl). */
 export const defaultBaseUrl = "https://api.dvito.cloud/api/v1";
 
 export class ZeishApiError extends Error {
@@ -63,7 +63,7 @@ export class ZeishApiError extends Error {
     return this.error?.details;
   }
 
-  /** True when Edge rejected request shape (e.g. ttl_seconds too_big). */
+  /** True when the control plane rejected request shape (e.g. ttl_seconds too_big). */
   get isValidationError(): boolean {
     return this.status === 400 && this.error?.code === "invalid_request";
   }
@@ -147,7 +147,7 @@ function mutation(
   };
 }
 
-/** Typed client for the versioned Edge public API. */
+/** Typed client for the versioned control-plane public API. */
 export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
   const transport = config.transport ?? createZeishTransport(config);
   const apiRequest = <T>(path: string, init: RequestInit = {}) =>
@@ -242,12 +242,12 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
         `${sandboxPath(sandboxId)}/terminal-url`,
       ),
     createPreviewCode: async (sandboxId, input = {}) => {
-      // Clamp ttl_seconds to Edge contract (1..PREVIEW_CODE_TTL_MAX) before send.
+      // Clamp ttl_seconds to the control-plane contract (1..PREVIEW_CODE_TTL_MAX) before send.
       const normalized: ZeishCreatePreviewCodeInput = {
         ...input,
         ttl_seconds: clampPreviewTtlSeconds(input.ttl_seconds),
       };
-      // Edge PreviewCode: url, handoff_url, base_url, code, expires_at.
+      // Control-plane PreviewCode: url, handoff_url, base_url, code, expires_at.
       // Normalize to camelCase + Bearer headers for agents.
       const raw = await apiRequest<ZeishPreviewCodeResponse>(
         `${sandboxPath(sandboxId)}/preview-codes`,
@@ -259,7 +259,7 @@ export function createZeishApi(config: ZeishConfig): ZeishPublicApi {
       return normalizePreviewCode(raw);
     },
     createTunnelAccess: async (sandboxId, input = {}) => {
-      // Clamp ttl_seconds to Edge contract (1..TUNNEL_ACCESS_TTL_MAX) before send.
+      // Clamp ttl_seconds to the control-plane contract (1..TUNNEL_ACCESS_TTL_MAX) before send.
       const normalized: ZeishCreateTunnelAccessInput = {
         ttl_seconds: clampTunnelTtlSeconds(input.ttl_seconds),
       };
